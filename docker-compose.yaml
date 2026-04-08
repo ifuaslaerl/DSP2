@@ -1,0 +1,9 @@
+services:
+  dsp2-env:
+    build: .
+    container_name: dsp2_dev
+    # Mapeia a pasta atual (host) para /app (contêiner)
+    volumes:
+      - .:/app:z
+    stdin_open: true 
+    tty: true
