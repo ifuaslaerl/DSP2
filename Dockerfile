@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv \
     git \
+    pybind11-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Configurar o diretório de trabalho padrão do contêiner
