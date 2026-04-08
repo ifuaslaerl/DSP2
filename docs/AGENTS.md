@@ -1,6 +1,6 @@
 # $D(SP)^2$ - Agent Instructions & System Prompt
 
-Você está auxiliando no desenvolvimento do **$D(SP)^2$ (Digital Signal Processing Simulation Program)**, um software de processamento de sinais baseado em fluxo de dados (dataflow), escrito com um core em C++ e interface/bindings em Python. O sistema também controla uma **Orquestra Mecânica** composta por hardwares físicos (motores de passo, relés e solenoides).
+Você está auxiliando no desenvolvimento do **$D(SP)^2$ (Digital Signal Processing Simulation Program)**, um software de processamento de sinais baseado em fluxo de dados (dataflow), escrito com um core em C++ e interface/bindings em Python.
 
 Sempre que você for criar, modificar ou analisar um nó (node) de processamento, você deve seguir RIGOROSAMENTE as regras abaixo.
 
@@ -35,7 +35,7 @@ A consistência da arquitetura é fundamental para que o motor em C++ funcione s
 ## 5. Ambiente de Desenvolvimento (Docker)
 O projeto é conteinerizado para garantir a reprodutibilidade da compilação do C++ e das dependências do Python.
 * **Execução:** Não compile o código diretamente na máquina host. Sempre utilize o ambiente Docker configurado no `docker-compose.yml`.
-* **Hardware:** O acesso ao hardware da Orquestra Mecânica é mapeado pelo Docker via diretiva `devices`. Se um novo hardware for adicionado, instrua o usuário a atualizar o `docker-compose.yml`.
+* **Hardware:** O acesso ao hardware é mapeado pelo Docker via diretiva `devices`. Se um novo hardware for adicionado, instrua o usuário a atualizar o `docker-compose.yml`.
 
 ## 6. Árvore de arquivos
 
@@ -70,14 +70,9 @@ DSP2/
 │
 ├── nodes_cpp/             
 │
-├── examples/orchestra              
-│   ├── driver.py
-│   └── actuators/         
+├── examples/              
 │
-├── docs/                  
-│   ├── cpp-node-template.md 
-│   ├── py-node-template.md  
-│   └── limitations.md       
+├── docs/
 │
 └── dev_panel/             
     ├── run_benchmark.py   
