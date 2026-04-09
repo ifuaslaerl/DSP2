@@ -10,6 +10,7 @@ O D(SP)^2 funciona através de um grafo direcionado onde cada "nó" representa u
 * **Estrutura do Nó:** Todo novo nó C++ deve herdar da classe base `[NOME_DA_CLASSE_BASE]` e implementar obrigatoriamente a função de processamento `[NOME_DA_FUNCAO_DE_PROCESSAMENTO]`.
 * **Entradas e Saídas:** Os nós se comunicam passando buffers de áudio/sinais de tamanho fixo. As entradas devem ser declaradas no construtor do nó. 
 * **Ausência de Estado Global:** Os nós devem ser autocontidos. Não utilize variáveis globais para armazenar estados (como delays ou fases de osciladores); todo o estado interno deve pertencer à instância da classe do nó.
+* **Imutabilidade:** É estritamente proibido que um nó modifique os dados do seu buffer de entrada. A passagem de sinal entre arestas é feita por referência de memória (Zero-Copy). Para garantir isto, as variáveis de entrada na classe base (node_base.hpp) e nos nós herdeiros devem ser sempre declaradas como ponteiros constantes: const T* input_buffer. Qualquer tentativa de reescrever input_buffer[i] = ... resultará num erro de compilação. Os nós apenas podem escrever nos seus próprios T* output_buffer.
 
 ## 2. Restrições de Performance e Sistema Embarcado
 Como este é um motor de processamento de sinais de áudio/tempo real, a performance e o determinismo são críticos. Dentro do loop de processamento de áudio (a função que processa os buffers amostra por amostra):
