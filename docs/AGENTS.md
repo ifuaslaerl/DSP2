@@ -41,7 +41,34 @@ O projeto é conteinerizado para garantir a reprodutibilidade da compilação do
 * **Execução:** Não compile o código diretamente na máquina host. Sempre utilize o ambiente Docker configurado no `docker-compose.yml`.
 * **Hardware:** O acesso ao hardware é mapeado pelo Docker via diretiva `devices`. Se um novo hardware for adicionado, instrua o usuário a atualizar o `docker-compose.yml`.
 
-## 6. Árvore de arquivos
+## 6. Sistema de Logging e Debug (Tempo Real)
+A depuração entre a ponte C++ e Python não deve comprometer a performance do motor de áudio. Se precisar criar logs ou rastrear erros matemáticos dentro da função `process()` de um nó, **NÃO USE** `std::cout`, `printf` ou ferramentas padrão. Você deve utilizar o Logger Nativo do Core.
+Ao trabalhar com o sistema de *logs* do $D(SP)^2$, siga RIGOROSAMENTE estas 4 regras:
+### 1. Custo Zero no Modo Embarcado (Macro de Exclusão)
+O logger só pode existir quando o sistema compila para `SIMULATION`. Todo e qualquer comando de log deve estar encapsulado em macros que o compilador ignore completamente no alvo `EMBEDDED`.
+* **Uso Obrigatório:** Utilize apenas as macros fornecidas (ex: `DSP2_LOG_INFO()`, `DSP2_LOG_ERROR()`), que internamente estão protegidas por `#ifndef DSP2_EMBEDDED_MODE`.
+### 2. Lock-Free e Zero-I/O (Segurança de Tempo Real)
+* **PROIBIDO I/O:** Nunca imprima no terminal a partir de um nó em C++.
+* **Mecanismo:** O logger atua como um **Ring Buffer SPSC (Single-Producer, Single-Consumer)**. O nó (Produtor) apenas copia a mensagem de erro para o buffer pré-alocado e avança o ponteiro de forma atómica. É proibida a utilização de *mutexes* (locks) neste processo de escrita.
+### 3. Zero Alocação Dinâmica de Strings
+* **PROIBIDO Concatenar ou Alocar Strings:** Não instancie ou modifique `std::string` dinamicamente no momento do *log* (ex: evitar `DSP2_LOG_ERROR("Erro: " + std::to_string(val))`), pois isso invoca alocação no *heap*.
+* Utilize apenas mensagens literais constantes (`const char*`) ou *buffers* de tamanho fixo previamente alocados na fase `prepare()`.
+### 4. Orquestração e Consumo via Python
+* As mensagens armazenadas no Ring Buffer em C++ devem ser consumidas exclusivamente pelo ambiente Python.
+* A ponte `pybind11` (`bindings/bind_python.cpp`) deve expor uma função de *polling* (ex: `dsp2_core.get_logs()`) para que o terminal Python possa ler as falhas atiradas pelos nós sem interromper a execução do DSP.
+**Exemplo de Implementação Correta no `process()`:**
+```cpp
+void process() override {
+    if (divisor == 0.0f) {
+        // Correto: Usa a macro segura, string estática, O(1), sem locks.
+        DSP2_LOG_ERROR("Divisão por zero detectada no módulo Biquad.");
+        return; 
+    }
+    // ... matemática continua
+}
+```
+
+## 7. Árvore de arquivos
 
 O projeto deve conter os seguintes arquivos nessa estrutura.
 
