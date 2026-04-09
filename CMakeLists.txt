@@ -55,7 +55,14 @@ if(DSP2_TARGET STREQUAL "SIMULATION")
 elseif(DSP2_TARGET STREQUAL "EMBEDDED")
     message(STATUS "A configurar ambiente Embarcado (Apenas Biblioteca Core)...")
     
+    # Desativa exceções e RTTI para otimização crítica de memória/CPU em microcontroladores
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(dsp2_core PRIVATE -fno-exceptions -fno-rtti)
+    endif()
+    
+    # Define uma macro para o código C++ saber que estamos em modo de embarque (modo mínimo)
+    target_compile_definitions(dsp2_core PRIVATE DSP2_EMBEDDED_MODE)
+
     # No modo embarcado, ignoramos completamente a pasta bindings/ e o Python.
     # O build vai simplesmente gerar o 'libdsp2_core.a' na pasta de build.
-    # O projeto de firmware externo irá importar este .a e os cabeçalhos do /core.
 endif()

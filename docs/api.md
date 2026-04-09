@@ -9,5 +9,4 @@ Funções para manipular blocos inteiros de áudio de forma rápida.
 ## 2. Aproximações Matemáticas Rápidas (Fast Math)
 Funções trigonométricas e logarítmicas que trocam precisão absoluta por velocidade extrema.
 
----
-*Última atualização: [Data]*
+**Regra Estrita de Hardware:** Funções da biblioteca `<cmath>` são lentas em microcontroladores sem FPU ou causam gargalos de ciclos. Todo o cálculo matemático nos nós `nodes_cpp/` DEVE consumir as tabelas de pesquisa (Lookup Tables - LUTs) ou aproximações de Taylor listadas abaixo.

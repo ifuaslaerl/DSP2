@@ -17,7 +17,7 @@ $D(SP)^2$ É uma ferramenta feita para auxiliar a prototipagem de sistemas de pr
 git clone https://github.com/ifuaslaerl/DSP2.git
 
 # 2. Inicie o ambiente isolado em segundo plano.
-sudo docker-compose up -d --build
+sudo docker compose up -d --build
 ```
 
 ## **Compilação**
