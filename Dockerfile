@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     python3 \
     python3-pip \
+    python3-dev \
     python3-venv \
     git \
     pybind11-dev \

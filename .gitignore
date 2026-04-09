@@ -107,7 +107,3 @@ dev_panel/plots/
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Diretórios de build
-build/
-build-*/
