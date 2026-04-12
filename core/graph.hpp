@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <stack>
 #include "node_base.hpp"
 
 using namespace std;
@@ -28,15 +29,40 @@ class Graph {
         vector<Edge> edges;
 
         // As camadas de execução topológica para o Thread Pool (Paralelismo)
-        // Camada 0 processa primeiro. Camada 1 só processa quando a 0 terminar, etc.
         vector<vector<int>> execution_layers;
+
+        // Armazena os Componentes Fortemente Conexos (SCCs) encontrados
+        // Cada sub-vetor contém os IDs dos nós que formam um ciclo fechado
+        vector<vector<int>> sccs;
 
         // ==========================================
         // Funções Internas de Compilação (Seguras para alocar)
         // ==========================================
 
+        // Helpers para o Algoritmo de Kosaraju
+        void build_adjacency_lists(vector<vector<int>>& adj, vector<vector<int>>& adj_rev);
+        void dfs1(int v, vector<bool>& visited, stack<int>& finish_stack, const vector<vector<int>>& adj);
+        void dfs2(int v, vector<bool>& visited, vector<int>& component, const vector<vector<int>>& adj_rev);
+        
+        /**
+         * @brief Executa o Algoritmo de Kosaraju para preencher o vetor sccs.
+         */
+        void run_kosaraju();
+
+        /**
+         * @brief Utiliza os SCCs para verificar se o grafo é um DAG perfeito.
+         * Retorna true se houver ciclos (algum SCC com tamanho > 1 ou com self-loop).
+         */
         bool detect_cycles();
+        
+        /**
+         * @brief Condensa o grafo agrupando nós de cada SCC e gera a ordenação topológica.
+         */
         void build_dag_layers();
+        
+        /**
+         * @brief Trata os nós dentro de um SCC (ex: alocando buffers de atraso/feedback explícito).
+         */
         void resolve_cyclic_graph();
         
         /**
@@ -56,13 +82,6 @@ class Graph {
 
         void add_node(NodeBase<T>* node);
         
-        /**
-         * @brief Adiciona uma ligação entre a porta de saída de um nó e a porta de entrada de outro.
-         * @param source_id Índice do nó de origem.
-         * @param source_port Índice da saída do nó de origem.
-         * @param dest_id Índice do nó de destino.
-         * @param dest_port Índice da entrada do nó de destino.
-         */
         void add_edge(int source_id, int source_port, int dest_id, int dest_port);
 
         // ==========================================
