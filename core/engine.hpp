@@ -1,15 +1,7 @@
 #pragma once
 
 #include "graph.hpp"
-
-// ==========================================
-// Constantes Globais de Configuração
-// ==========================================
-namespace DSP2Config {
-    // Utilização de inline constexpr (C++17) para definição segura em cabeçalhos
-    inline constexpr double DEFAULT_SAMPLE_RATE = 44100.0;
-    inline constexpr int DEFAULT_BLOCK_SIZE = 256;
-}
+#include "constants.hpp"
 
 /**
  * @brief O motor principal do DSP2.

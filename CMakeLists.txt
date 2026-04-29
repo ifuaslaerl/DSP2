@@ -73,11 +73,23 @@ endif()
 # Ativa o suporte nativo a testes do CMake
 enable_testing()
 
-# Compila o executável do teste da Fase 1
-add_executable(test_phase1 tests/test_phase1.cpp)
-target_link_libraries(test_phase1 PRIVATE dsp2_core)
+# Procura dinamicamente por todos os ficheiros que comecem por "test_" na pasta tests/
+# CONFIGURE_DEPENDS garante que o CMake deteta novos ficheiros sem precisares de limpar o build
+file(GLOB TEST_SOURCES CONFIGURE_DEPENDS "tests/test_*.cpp")
 
-# Regista o teste no CTest
-add_test(NAME Phase1_CoreDataflow_Test COMMAND test_phase1)
+# Itera sobre cada ficheiro encontrado
+foreach(TEST_SOURCE ${TEST_SOURCES})
+    # Extrai o nome do ficheiro sem o caminho e sem a extensão (ex: test_phase1)
+    get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
+    
+    # Cria o executável
+    add_executable(${TEST_NAME} ${TEST_SOURCE})
+    
+    # Liga à biblioteca principal do core
+    target_link_libraries(${TEST_NAME} PRIVATE dsp2_core)
+    
+    # Regista o teste no CTest
+    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+endforeach()
 
-message(STATUS "Testes configurados. Execute 'make test' apos compilar para rodar a validacao.")
+message(STATUS "Testes dinâmicos configurados. Execute 'make test' apos compilar.")
