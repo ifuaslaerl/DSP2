@@ -1,4 +1,3 @@
-# Arquivo escrito pelo Gemini pro
 FROM ubuntu:22.04
 
 # Evitar interações manuais durante a instalação de pacotes
@@ -19,5 +18,5 @@ RUN apt-get update && apt-get install -y \
 # Configurar o diretório de trabalho padrão do contêiner
 WORKDIR /app
 
-# Manter o contêiner rodando em background
+# Shell interativo como processo principal do ambiente de desenvolvimento
 CMD ["/bin/bash"]

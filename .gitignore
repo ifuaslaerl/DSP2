@@ -93,6 +93,7 @@ dev_panel/plots/
 !.vscode/tasks.json
 !.vscode/launch.json
 *.code-workspace
+.codex/
 
 # JetBrains (CLion, PyCharm)
 .idea/

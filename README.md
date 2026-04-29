@@ -4,68 +4,169 @@
 
 $D(SP)^2$ É uma ferramenta feita para auxiliar a prototipagem de sistemas de processamento digital de sinais, com arquitetura modular, escalável e suporte nativo para embarcar a modelagem.
 
-## **Pré-Requisitos**
+## Pré-Requisitos
 
-* **Docker** e **Docker Compose** instalados na máquina host.
-  * *Nota de versão:* Recomendamos a utilização do Docker Compose V2.
-* Sistema operacional Linux
+O workflow oficial do projeto é único para toda a equipa:
 
-## **Instalação**
+- subir o ambiente com `docker compose up -d --build`
+- entrar no contêiner com `docker compose exec dsp2-env bash`
+- compilar e testar apenas dentro do contêiner
+
+Para isso, o host precisa ter:
+
+- Docker Engine
+- Docker Compose V2 (`docker compose`)
+- Linux nativo ou WSL 2
+
+## Configuração do Host
+
+### Linux nativo
+
+Instale o Docker Engine e o plugin Compose V2 usando o gestor de pacotes da sua distribuição ou as instruções oficiais do Docker.
+
+Depois valide no terminal do host:
 
 ```bash
-# 1. Clone este repositório para a sua máquina local.
-git clone https://github.com/ifuaslaerl/DSP2.git
-
-# 2. Inicie o ambiente isolado em segundo plano.
-sudo docker compose up -d --build
+docker --version
+docker compose version
+docker info
 ```
 
-## **Compilação**
+Se o seu utilizador não tiver acesso ao socket do Docker, use `sudo` ou ajuste as permissões do grupo `docker` de acordo com a sua distribuição.
+
+### WSL 2
+
+Este repositório suporta desenvolvimento a partir de uma distro WSL 2, desde que o Docker Engine e o Compose V2 estejam instalados dentro da própria distro.
+
+Depois valide no terminal da distro:
+
+```bash
+docker --version
+docker compose version
+docker info
+```
+
+Se o daemon não estiver ativo, inicie-o antes de subir o ambiente do projeto. O comando exato depende de como o Docker foi instalado na sua distro.
+
+No setup inicial, pode ser necessário aplicar o grupo `docker` na sessão atual e iniciar o daemon manualmente:
+
+```bash
+newgrp docker
+sudo service docker start
+docker info
+docker compose version
+```
+
+## Clonar o repositório
+
+```bash
+git clone https://github.com/ifuaslaerl/DSP2.git
+cd DSP2
+```
+
+## Subir o ambiente de desenvolvimento
+
+Na raiz do repositório, execute:
+
+```bash
+docker compose up -d --build
+```
+
+O serviço de desenvolvimento chama-se `dsp2-env`. Para abrir um shell interativo dentro do contêiner:
+
+```bash
+docker compose exec dsp2-env bash
+```
+
+Se o seu host exigir privilégios para aceder ao Docker, prefixe os comandos com `sudo`.
+
+## Uso diário
+
+Depois que o Docker do host estiver configurado, o fluxo normal de trabalho é:
+
+```bash
+cd /mnt/c/Users/caiod/DSP2
+docker compose up -d
+docker compose exec dsp2-env bash
+```
+
+Notas práticas:
+
+- Use `docker compose up -d --build` apenas quando a imagem ainda não existir ou quando o `Dockerfile` mudar.
+- Você não precisa reinstalar Docker, Compose ou repetir `newgrp docker` em todo uso.
+- Em WSL 2, `sudo service docker start` pode ser necessário em uma nova sessão se o daemon não subir sozinho.
+
+## Compilação
 
 O nosso sistema de compilação utiliza o CMake e está dividido em dois alvos principais: a simulação com *bindings* em Python e a biblioteca estática em C++ para sistemas embarcados. 
 
-**⚠️ Regra de Ouro:** Nunca compiles o código diretamente na raiz do projeto. Cria sempre uma pasta de *build* separada. O nosso ficheiro `.gitignore` já está configurado para ignorar qualquer diretório que comece por `build-` ou `build/`. Isto garante que cada membro da equipa possa compilar o código localmente sem enviar ficheiros binários ou temporários para o repositório.
+Regra de ouro: nunca compile o código diretamente na raiz do projeto. Crie sempre uma pasta de `build` separada. O `.gitignore` já está configurado para ignorar diretórios `build/`, `build-*` e variantes próximas.
+
+Todos os comandos abaixo devem ser executados dentro do contêiner.
 
 ### Compilar para Simulação
 Este é o modo predefinido. Ele compila a matemática do *core* e gera a biblioteca partilhada (`.so`) através do `pybind11`, permitindo que o Python construa o grafo e orquestre o motor.
 
-Dentro do terminal do Docker (após executar `sudo docker-compose exec dsp2-env /bin/bash`), executa os seguintes comandos:
+Dentro do shell do contêiner, execute:
 
 ```bash
-# Criar e entrar na pasta de build da simulação
 mkdir build-sim
 cd build-sim
 
-# Configurar o CMake apontando para o diretório raiz (..)
 cmake -DDSP2_TARGET=SIMULATION ..
-
-# Executar a compilação
 make
 ```
 
-## Compilar para Sistema Embarcado 
+### Compilar para Sistema Embarcado
 
 Este modo isola o C++ de qualquer dependência do Sistema Operativo ou do Python. Ele ignora a pasta bindings/ e gera apenas a biblioteca estática (libdsp2_core.a) que será posteriormente incluída no firmware do microcontrolador.
 
-Dentro do terminal do Docker, execute:
+Dentro do shell do contêiner, execute:
 
 ```bash
-# 1. Voltar à raiz (se estiveres noutra pasta de build) e criar uma nova pasta
 mkdir build-embedded
 cd build-embedded
 
-# 2. Configurar o CMake especificando o alvo EMBEDDED
 cmake -DDSP2_TARGET=EMBEDDED ..
-
-# 3. Executar a compilação
 make
 ```
 
-## **Modo de Uso**
+### Rodar os testes
 
-Todo o desenvolvimento, a compilação do motor em C++ e a execução da interface em Python devem ser feitos exclusivamente dentro do contêiner para garantir a reprodutibilidade do sistema em tempo real.
+Após compilar o alvo embarcado, rode:
 
 ```bash
-# Para entrar no terminal interativo do Docker
-sudo docker-compose exec dsp2-env /bin/bash
+cd build-embedded
+make test
 ```
+
+Se as pastas `build-sim` e `build-embedded` já existirem, não é preciso recriá-las; entre nelas e rode `make` ou `make test` conforme necessário.
+
+## Primeira validação recomendada
+
+Para verificar se o ambiente ficou funcional no seu host:
+
+```bash
+docker compose up -d --build
+docker compose exec dsp2-env bash
+```
+
+E, já dentro do contêiner:
+
+```bash
+mkdir build-sim
+cd build-sim
+cmake -DDSP2_TARGET=SIMULATION ..
+make
+
+cd /app
+mkdir build-embedded
+cd build-embedded
+cmake -DDSP2_TARGET=EMBEDDED ..
+make
+make test
+```
+
+## Nota sobre Linux com SELinux
+
+O `docker-compose.yaml` usa o bind mount portável `.:/app` para funcionar tanto em Linux como em WSL 2. Se algum host Linux com SELinux precisar de rotulagem explícita de volume, esse ajuste deve ser feito localmente nesse host, sem alterar o workflow principal do projeto.
