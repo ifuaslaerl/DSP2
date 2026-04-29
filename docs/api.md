@@ -42,3 +42,15 @@ Para enviar avisos ou capturar exceções matemáticas em tempo real para a inte
 **Regras de Uso:**
 - **Zero-Allocation:** As macros aceitam **APENAS** literais constantes de string (`const char*`). Nunca utilize formatação dinâmica (como `std::to_string()`) dentro delas para evitar a invocação do *heap*.
 - **Otimização Embarcada:** O uso destas macros é totalmente seguro. Quando compilado com `DSP2_TARGET=EMBEDDED`, o compilador resolve estas chamadas para código vazio, resultando em custo zero de CPU e Memória para o microcontrolador.
+
+## 4. Interface Python (Pybind11)
+
+As funções abaixo estão disponíveis no módulo Python `dsp2._dsp2_core`.
+
+### `get_logs() -> List[LogEvent]`
+- **Descrição:** Ponto de entrada para o mecanismo de Polling do Python. Retorna todos os logs que foram emitidos pelo C++ desde a última chamada.
+- **Uso Recomendado:** Chamar em um loop assíncrono ou thread de interface no Python para monitorar a saúde do motor sem interferir na thread de áudio.
+
+### `Engine` (Binding)
+- **Métodos:** `set_audio_parameters`, `prepare_engine`, `process_block`.
+- **Tipo:** Instanciado em Python para rodar a simulação com precisão de 64-bits (`double`).
