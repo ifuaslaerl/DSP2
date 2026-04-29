@@ -4,6 +4,9 @@
 # Diretórios de build
 build/
 build_*/
+build*/
+build_test/
+build_embedded/
 bin/
 lib/
 out/
