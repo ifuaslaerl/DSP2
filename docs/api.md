@@ -6,6 +6,20 @@ Este documento lista as funções, utilitários matemáticos e classes base disp
 ## 1. Operações de Buffer (SIMD Otimizadas)
 Funções para manipular blocos inteiros de áudio de forma rápida.
 
+Toda a matemática de blocos deve ser feita invocando o namespace `DSP2BufferOps`. Estas funções foram estruturadas para garantir o *auto-vectorizing* (SIMD) em -O3, trocando ciclos longos de processador por operações paralelas em hardware.
+
+### `DSP2BufferOps::add<T>(T* __restrict dest, const T* __restrict src, int size)`
+- **Descrição:** Realiza a soma de dois buffers ponto a ponto. O resultado é acumulado no buffer `dest`. Ideal para mixagem de sinais de áudio.
+
+### `DSP2BufferOps::multiply<T>(T* __restrict dest, const T* __restrict src, int size)`
+- **Descrição:** Multiplicação ponto a ponto (Modulação em Anel). 
+
+### `DSP2BufferOps::multiply_scalar<T>(T* dest, T scalar, int size)`
+- **Descrição:** Aplica um ganho/atenuação linear fixo a todo o bloco de áudio.
+
+### `DSP2BufferOps::clear<T>(T* dest, int size)`
+- **Descrição:** Preenche rapidamente o buffer especificado com zeros estáticos de acordo com a tipagem, sem chamar o memset global que pode ignorar otimizações de FPU.
+
 ## 2. Aproximações Matemáticas Rápidas (Fast Math)
 Funções trigonométricas e logarítmicas que trocam precisão absoluta por velocidade extrema.
 

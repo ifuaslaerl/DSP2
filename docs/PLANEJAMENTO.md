@@ -7,6 +7,7 @@
 * **2.1. Tabelas de Pesquisa (LUTs):** Criar osciladores tabulados em C++ para evitar a `<cmath>` pesada que bloqueia microcontroladores.
 * **2.2. Fast Math e SIMD:** Implementar aproximações performantes em C++ para operações matriciais e de buffer que todos os vértices irão consumir.
 * **2.3. Sistema de Logging Lock-Free:** Criar um Ring Buffer (SPSC) no core C++ para armazenar mensagens de erro sem alocação dinâmica. Implementar macros (`DSP2_LOG_ERROR`) que desativam o logger com custo zero quando compilado para o alvo `EMBEDDED`."
+
 ### Fase 3: A Ponte Pybind11 e Interface Híbrida
 * **3.1. Bindings Avançados:** Expor a função de leitura do Ring Buffer do logger (`get_logs()`) para o Python através do `pybind11`.
 * **3.2. Orquestração Híbrida:** Implementar uma thread ou mecanismo de polling assíncrono no `dsp2/build_graph.py` para consumir e exibir no terminal os avisos emitidos pelo core sem bloquear o fluxo de sinal.
