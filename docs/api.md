@@ -30,3 +30,15 @@ Funções trigonométricas e logarítmicas que trocam precisão absoluta por vel
 - **Descrição:** Tabela de pesquisa pré-calculada para geração de senoide.
 - **Configuração:** O tamanho padrão é definido pela constante `DSP2Config::SINE_LUT_DEFAULT_SIZE` em `core/constants.hpp`.
 - **Notas de Performance:** Implementação $O(1)$ sem chamadas de `std::sin` no loop de áudio. Utiliza `DSP2Config::PI` (calculado via `std::acos(-1)`) para a geração inicial da tabela.
+
+## 3. Sistema de Logging (Zero-Cost / Lock-Free)
+
+Para enviar avisos ou capturar exceções matemáticas em tempo real para a interface Python sem causar gargalos na thread de áudio, utilize as macros do Core Logger. Elas usam um SPSC Ring Buffer sob o capô, garantindo segurança lock-free de O(1).
+
+### Macros de Log:
+* **`DSP2_LOG_INFO("Sua mensagem aqui");`**
+* **`DSP2_LOG_ERROR("Sua mensagem aqui");`**
+
+**Regras de Uso:**
+- **Zero-Allocation:** As macros aceitam **APENAS** literais constantes de string (`const char*`). Nunca utilize formatação dinâmica (como `std::to_string()`) dentro delas para evitar a invocação do *heap*.
+- **Otimização Embarcada:** O uso destas macros é totalmente seguro. Quando compilado com `DSP2_TARGET=EMBEDDED`, o compilador resolve estas chamadas para código vazio, resultando em custo zero de CPU e Memória para o microcontrolador.
