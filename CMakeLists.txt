@@ -66,3 +66,18 @@ elseif(DSP2_TARGET STREQUAL "EMBEDDED")
     # No modo embarcado, ignoramos completamente a pasta bindings/ e o Python.
     # O build vai simplesmente gerar o 'libdsp2_core.a' na pasta de build.
 endif()
+
+# ==========================================
+# 3. Testes Unitários e Validação (CTest)
+# ==========================================
+# Ativa o suporte nativo a testes do CMake
+enable_testing()
+
+# Compila o executável do teste da Fase 1
+add_executable(test_phase1 tests/test_phase1.cpp)
+target_link_libraries(test_phase1 PRIVATE dsp2_core)
+
+# Regista o teste no CTest
+add_test(NAME Phase1_CoreDataflow_Test COMMAND test_phase1)
+
+message(STATUS "Testes configurados. Execute 'make test' apos compilar para rodar a validacao.")

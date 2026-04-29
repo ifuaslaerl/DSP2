@@ -2,6 +2,10 @@
 
 // Para garantir o modo embarcado sem exceções, evitamos bibliotecas padrão pesadas
 #include <cstdint>
+#include <vector>
+
+// Forward declaration para que o compilador saiba que a classe Graph existe
+template <typename T> class Graph;
 
 /**
  * @brief Classe base virtual pura para todos os nós (vértices) de processamento de sinal do DSP2.
@@ -11,6 +15,11 @@
  */
 template <typename T>
 class NodeBase {
+
+    // Conceder acesso privilegiado ao Graph
+    // Isto permite que a função bind_pointers() aceda aos buffers "protected"
+    friend class Graph<T>;
+
     protected:
         // Múltiplas saídas (onde este nó escreve)
         // O tamanho deste vector é definido no construtor de cada nó específico.
