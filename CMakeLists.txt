@@ -23,6 +23,8 @@ add_library(dsp2_core STATIC
     # nodes_cpp/meu_no_matematico.cpp
 )
 
+set_target_properties(dsp2_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # Exporta os cabeçalhos para quem for usar a biblioteca
 target_include_directories(dsp2_core PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>

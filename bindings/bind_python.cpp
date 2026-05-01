@@ -40,7 +40,7 @@ PYBIND11_MODULE(_dsp2_core, m) {
         });
 
     m.def("get_logs", &get_logs_wrapper, "Retorna uma lista com todos os logs acumulados no Core.");
-
+    
     // --- Exposição do Engine (Fase de Simulação) ---
     
     // Vinculamos a versão <double> para uso no Python/Simulação
@@ -48,5 +48,8 @@ PYBIND11_MODULE(_dsp2_core, m) {
         .def(py::init<>())
         .def("set_audio_parameters", &Engine<double>::set_audio_parameters)
         .def("prepare_engine", &Engine<double>::prepare_engine)
-        .def("process_block", &Engine<double>::process_block);
+        .def("process_block", &Engine<double>::process_block)
+        // ---> ADICIONE ESTAS DUAS LINHAS ABAIXO <---
+        .def("add_node", &Engine<double>::add_node, "Adiciona um nó pelo nome da classe e retorna seu ID interno")
+        .def("add_edge", &Engine<double>::add_edge, "Conecta a porta de saída de um nó à porta de entrada de outro");
 }

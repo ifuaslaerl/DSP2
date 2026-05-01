@@ -95,4 +95,7 @@ class Graph {
         // ==========================================
         
         void process();
+
+        // Adição para a Fase 3.3
+        int get_node_count() const { return nodes.size(); }
 };

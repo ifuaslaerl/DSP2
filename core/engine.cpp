@@ -1,4 +1,6 @@
 #include "engine.hpp"
+#include "node_factory.hpp"
+#include "../nodes_cpp/dummy_nodes.hpp"
 
 // ==========================================
 // Construtor e Destrutor
@@ -8,6 +10,8 @@ template <typename T>
 Engine<T>::Engine() : sampleRate(DSP2Config::DEFAULT_SAMPLE_RATE), blockSize(DSP2Config::DEFAULT_BLOCK_SIZE) {
     // Instancia o grafo principal do motor
     graph = new Graph<T>();
+
+    register_core_nodes();
 }
 
 template <typename T>
@@ -54,8 +58,28 @@ void Engine<T>::process_block() {
     }
 }
 
+template <typename T>
+int Engine<T>::add_node(const std::string& node_type) {
+    // Aloca memória dinamicamente apenas na fase de Setup
+    NodeBase<T>* node = NodeFactory<T>::get_instance().create(node_type);
+    if (!node) {
+        DSP2_LOG_ERROR("NodeFactory: Falha ao criar no - Tipo desconhecido!");
+        return -1; // Retorna erro para o Python lidar
+    }
+    graph->add_node(node);
+    return graph->get_node_count() - 1; // Retorna o ID (índice) do nó criado
+}
+
+template <typename T>
+void Engine<T>::add_edge(int src_id, int src_port, int dest_id, int dest_port) {
+    if (graph != nullptr) {
+        graph->add_edge(src_id, src_port, dest_id, dest_port);
+    }
+}
+
 // ==========================================
 // Instanciação Explícita de Templates (Garante o linking)
 // ==========================================
+
 template class Engine<double>; // Para uso em SIMULATION (Python bindings)
 template class Engine<float>;  // Para uso em EMBEDDED (Microcontroladores)

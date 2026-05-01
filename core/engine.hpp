@@ -1,5 +1,5 @@
 #pragma once
-
+#include <string>
 #include "graph.hpp"
 #include "constants.hpp"
 
@@ -49,4 +49,11 @@ public:
      * pela interrupção (ISR) de hardware (DMA/I2S).
      */
     void process_block();
+
+    // ==========================================
+    // Orquestração de Grafo (Fase 3.3)
+    // ==========================================
+
+    int add_node(const std::string& node_type);
+    void add_edge(int src_id, int src_port, int dest_id, int dest_port);
 };

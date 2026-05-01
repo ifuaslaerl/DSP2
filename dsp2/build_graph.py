@@ -1,6 +1,7 @@
 import time
 import threading
 import dsp2._dsp2_core as core
+from dsp2.graph_loader import GraphLoader
 
 from dsp2.constants import (
     DEFAULT_SAMPLE_RATE, 
@@ -70,6 +71,13 @@ class DSP2Orchestrator:
         if self.log_thread:
             self.log_thread.join()
         print("--- Processamento Encerrado ---")
+
+    def run_simulation(self, duration_seconds=DEFAULT_SIMULATION_DURATION):
+        # 1. NOVO: Carrega o Grafo dinamicamente antes do prepare()!
+        GraphLoader.load_from_json(self.engine, 'tests/graph_test.json')
+        
+        print("[Python] Preparando Engine (Aloca o de Mem ria C++)...")
+        self.engine.prepare_engine()
 
 
 if __name__ == "__main__":

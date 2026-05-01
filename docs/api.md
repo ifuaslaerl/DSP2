@@ -54,3 +54,19 @@ As funções abaixo estão disponíveis no módulo Python `dsp2._dsp2_core`.
 ### `Engine` (Binding)
 - **Métodos:** `set_audio_parameters`, `prepare_engine`, `process_block`.
 - **Tipo:** Instanciado em Python para rodar a simulação com precisão de 64-bits (`double`).
+
+## 5. NodeFactory e Criação Dinâmica (Fase 3.3)
+Para permitir que a interface Python (ou arquivos JSON) construa grafos de processamento sem necessidade de recompilar o motor, o $D(SP)^2$ utiliza um padrão Factory centralizado no arquivo `core/node_factory.hpp`.
+
+**Regra Estrita para Agentes de IA:**
+Sempre que você criar um novo arquivo de nó em `nodes_cpp/` (ex: `meu_filtro.hpp`), você **DEVE** registrá-lo na Factory. Caso contrário, o `GraphLoader` do Python retornará erro de "Tipo desconhecido" (ID -1).
+
+### `NodeFactory<T>::get_instance().register_node()`
+- **Assinatura:** `void register_node(const std::string& name, CreatorFunc creator)`
+- **Uso:** Deve ser chamado na inicialização do sistema (dentro de `register_core_nodes()` no `engine.cpp`).
+- **Exemplo de Registro:**
+  ```cpp
+  NodeFactory<double>::get_instance().register_node("FiltroBiquad", [](){ 
+      return new FiltroBiquad<double>(); 
+  });
+  ```
