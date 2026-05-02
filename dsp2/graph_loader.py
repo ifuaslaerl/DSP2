@@ -22,6 +22,11 @@ class GraphLoader:
             node_ids[name] = node_id
             print(f" -> Nó alocado C++: {name} ({node_type}) | ID: {node_id}")
 
+            if 'parameters' in node:
+                for param_name, value in node['parameters'].items():
+                    engine.set_node_parameter(node_id, param_name, float(value))
+                    print(f"    - Parâmetro configurado: {param_name} = {value}")
+
         # 2. Conectar as Arestas (Zero-Copy routing)
         for edge in data.get('edges', []):
             src = edge['source']

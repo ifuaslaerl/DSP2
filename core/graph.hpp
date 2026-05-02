@@ -98,4 +98,19 @@ class Graph {
 
         // Adição para a Fase 3.3
         int get_node_count() const { return nodes.size(); }
+
+        // Retorna o ponteiro bruto da saída de um nó específico
+        const T* get_node_output_buffer(int node_id, int port) const {
+            if (node_id >= 0 && static_cast<size_t>(node_id) < nodes.size() && 
+                port >= 0 && static_cast<size_t>(port) < nodes[node_id]->output_buffers.size()) {
+                return nodes[node_id]->output_buffers[port];
+            }
+            return nullptr;
+        }
+
+        void set_node_parameter(int node_id, const std::string& param_name, double value) {
+            if (node_id >= 0 && static_cast<size_t>(node_id) < nodes.size()) {
+                nodes[node_id]->set_parameter(param_name, value);
+            }
+        }
 };

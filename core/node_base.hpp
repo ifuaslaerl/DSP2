@@ -3,6 +3,7 @@
 // Para garantir o modo embarcado sem exceções, evitamos bibliotecas padrão pesadas
 #include <cstdint>
 #include <vector>
+#include <string>
 
 // Forward declaration para que o compilador saiba que a classe Graph existe
 template <typename T> class Graph;
@@ -50,4 +51,9 @@ class NodeBase {
          * 4. PROIBIDO locks bloqueantes (mutex) ou I/O (printf, std::cout).
          */
         virtual void process() = 0;
+
+        // Define um parâmetro interno estático do nó
+        virtual void set_parameter(const std::string& /* param_name */, double /* value */) {
+            // Método vazio por defeito
+        }
 };

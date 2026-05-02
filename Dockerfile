@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y \
     pybind11-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# ==========================================
+# Instalar bibliotecas Python para análise e gráficos
+RUN pip3 install matplotlib numpy
+# ==========================================
+
 # Configurar o diretório de trabalho padrão do contêiner
 WORKDIR /app
 

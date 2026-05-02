@@ -1,0 +1,14 @@
+{
+    "nodes": [
+        { "name": "Osc_A", "type": "SineOscillator", "parameters": { "frequency": 440.0 } },
+        { "name": "Osc_B", "type": "SineOscillator", "parameters": { "frequency": 220.0 } },
+        { "name": "Mixer", "type": "Add" },
+        { "name": "RingMod", "type": "Multiply" }
+    ],
+    "edges": [
+        { "source": "Osc_A", "source_port": 0, "dest": "Mixer", "dest_port": 0 },
+        { "source": "Osc_B", "source_port": 0, "dest": "Mixer", "dest_port": 1 },
+        { "source": "Osc_A", "source_port": 0, "dest": "RingMod", "dest_port": 0 },
+        { "source": "Osc_B", "source_port": 0, "dest": "RingMod", "dest_port": 1 }
+    ]
+}

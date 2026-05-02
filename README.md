@@ -85,7 +85,6 @@ Se o seu host exigir privilégios para aceder ao Docker, prefixe os comandos com
 Depois que o Docker do host estiver configurado, o fluxo normal de trabalho é:
 
 ```bash
-cd /mnt/c/Users/caiod/DSP2
 docker compose up -d
 docker compose exec dsp2-env bash
 ```

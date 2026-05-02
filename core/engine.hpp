@@ -51,9 +51,14 @@ public:
     void process_block();
 
     // ==========================================
-    // Orquestração de Grafo (Fase 3.3)
+    // Orquestração de Grafo
     // ==========================================
 
     int add_node(const std::string& node_type);
     void add_edge(int src_id, int src_port, int dest_id, int dest_port);
+
+    // Extrai o buffer de um nó e converte para std::vector (fácil de ler no Python)
+    std::vector<T> get_node_output(int node_id, int port);
+
+    void set_node_parameter(int node_id, const std::string& param_name, double value);
 };

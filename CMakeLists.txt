@@ -48,10 +48,10 @@ if(DSP2_TARGET STREQUAL "SIMULATION")
     pybind11_add_module(dsp2_bindings bindings/bind_python.cpp)
     target_link_libraries(dsp2_bindings PRIVATE dsp2_core)
     
-    # Coloca o ficheiro .so final na pasta dsp2/ DENTRO do diretório de build
+    # Coloca o ficheiro .so final na pasta dsp2/ DENTRO do diretório principal
     set_target_properties(dsp2_bindings PROPERTIES 
-        OUTPUT_NAME "_dsp2_core" 
-        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dsp2
+         OUTPUT_NAME "_dsp2_core"
+         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/dsp2
     )
 
 elseif(DSP2_TARGET STREQUAL "EMBEDDED")

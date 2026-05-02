@@ -1,6 +1,26 @@
 #include "engine.hpp"
 #include "node_factory.hpp"
 #include "../nodes_cpp/dummy_nodes.hpp"
+#include "../nodes_cpp/math_nodes.hpp"
+#include "../nodes_cpp/oscillator_nodes.hpp"
+
+// ==========================================
+// Função Global de Registro de Nós
+// ==========================================
+
+void register_core_nodes() {
+    // Nós de Teste (Dummies)
+    NodeFactory<double>::get_instance().register_node("DummyGenerator", [](){ return new DummyGenerator<double>(); });
+    NodeFactory<double>::get_instance().register_node("DummyMultiplier", [](){ return new DummyMultiplier<double>(); });
+
+    // Novos Nós Matemáticos (Fase 4.1)
+    NodeFactory<double>::get_instance().register_node("Add", [](){ return new AddNode<double>(); });
+    NodeFactory<double>::get_instance().register_node("Multiply", [](){ return new MultiplyNode<double>(); });
+    NodeFactory<double>::get_instance().register_node("Gain", [](){ return new GainNode<double>(); });
+    NodeFactory<double>::get_instance().register_node("Constant", [](){ return new ConstantNode<double>(); });
+
+    NodeFactory<double>::get_instance().register_node("SineOscillator", [](){ return new SineOscillator<double>(); });
+}
 
 // ==========================================
 // Construtor e Destrutor
@@ -74,6 +94,28 @@ template <typename T>
 void Engine<T>::add_edge(int src_id, int src_port, int dest_id, int dest_port) {
     if (graph != nullptr) {
         graph->add_edge(src_id, src_port, dest_id, dest_port);
+    }
+}
+
+template <typename T>
+std::vector<T> Engine<T>::get_node_output(int node_id, int port) {
+    std::vector<T> result(blockSize, static_cast<T>(0)); // Preenche com zeros por defeito
+    if (graph != nullptr) {
+        const T* buffer = graph->get_node_output_buffer(node_id, port);
+        if (buffer != nullptr) {
+            // Copia a memória Zero-Copy do C++ para um Vector independente e seguro
+            for (int i = 0; i < blockSize; ++i) {
+                result[i] = buffer[i];
+            }
+        }
+    }
+    return result;
+}
+
+template <typename T>
+void Engine<T>::set_node_parameter(int node_id, const std::string& param_name, double value) {
+    if (graph != nullptr) {
+        graph->set_node_parameter(node_id, param_name, value);
     }
 }
 

@@ -1,9 +1,9 @@
 services:
   dsp2-env:
-    build: .
+    build: 
+      context: .
+      network: host
     container_name: dsp2_dev
-    # Mapeia a pasta atual (host) para /app (contêiner).
-    # O sufixo :z foi removido para manter compatibilidade entre Linux e WSL 2.
     volumes:
       - .:/app
     stdin_open: true
