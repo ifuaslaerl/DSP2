@@ -10,7 +10,16 @@ from dsp2.constants import (
     DEFAULT_SIMULATION_DURATION
 )
 
+DEFAULT_GRAPH_PATH = "tests/math_test.json"
+
+
 class DSP2Orchestrator:
+    """Orquestra a simulacao hibrida Python/C++ do D(SP)^2.
+
+    A classe mantem o Python responsavel por montar o grafo e consumir logs,
+    enquanto o processamento de cada bloco permanece no core C++.
+    """
+
     def __init__(self):
         print("--- Inicializando Orquestrador D(SP)^2 ---")
         self.engine = core.Engine()
@@ -21,10 +30,7 @@ class DSP2Orchestrator:
         self.engine.set_signal_parameters(DEFAULT_SAMPLE_RATE, DEFAULT_BLOCK_SIZE)
 
     def _poll_logs(self):
-        """
-        Thread secundária: Monitoriza o C++ Ring Buffer.
-        Não bloqueia a execução do motor de áudio.
-        """
+        """Consome o Ring Buffer de logs C++ sem bloquear o loop de audio."""
         while self.is_running:
             logs = core.get_logs()
             for log in logs:
@@ -35,9 +41,11 @@ class DSP2Orchestrator:
             time.sleep(POLLING_INTERVAL_SEC) # Pausa baseada na constante
 
     def run_simulation(self, duration_seconds=DEFAULT_SIMULATION_DURATION):
-        """
-        Thread principal: Orquestra a compilação do grafo e o ciclo de áudio.
-        """
+        """Carrega o grafo padrao, prepara o engine e processa blocos simulados."""
+        # O grafo precisa ser montado antes do prepare_engine(), pois a fase de
+        # prepare aloca buffers e solda os ponteiros Zero-Copy no C++.
+        GraphLoader.load_from_json(self.engine, DEFAULT_GRAPH_PATH)
+
         print("[Python] Preparando Engine (Alocação de Memória C++)...")
         self.engine.prepare_engine()
 
@@ -70,14 +78,8 @@ class DSP2Orchestrator:
         self.is_running = False
         if self.log_thread:
             self.log_thread.join()
+            self.log_thread = None
         print("--- Processamento Encerrado ---")
-
-    def run_simulation(self, duration_seconds=DEFAULT_SIMULATION_DURATION):
-        # 1. NOVO: Carrega o Grafo dinamicamente antes do prepare()!
-        GraphLoader.load_from_json(self.engine, 'tests/math_test.json')
-        
-        print("[Python] Preparando Engine (Aloca o de Mem ria C++)...")
-        self.engine.prepare_engine()
 
 
 if __name__ == "__main__":
