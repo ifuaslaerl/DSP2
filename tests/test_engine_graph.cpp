@@ -1,8 +1,14 @@
 #include <cmath>
 #include <iostream>
+#include <type_traits>
 #include <vector>
 
 #include "../core/engine.hpp"
+
+static_assert(!std::is_copy_constructible<Engine<double>>::value,
+              "Engine must not be copy constructible because it owns a Graph.");
+static_assert(!std::is_copy_assignable<Engine<double>>::value,
+              "Engine must not be copy assignable because it owns a Graph.");
 
 int main() {
     std::cout << "--- D(SP)^2 : Engine/Graph integration smoke test ---\n";

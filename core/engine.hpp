@@ -10,6 +10,7 @@
 template <typename T>
 class Engine {
 private:
+    // O Engine e dono do grafo principal e o libera no destrutor.
     Graph<T>* graph;
     
     // Parâmetros globais de processamento
@@ -21,6 +22,8 @@ private:
 
 public:
     Engine();
+    Engine(const Engine&) = delete;
+    Engine& operator=(const Engine&) = delete;
     ~Engine();
 
     // ==========================================
