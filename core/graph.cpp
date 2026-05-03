@@ -238,7 +238,14 @@ void Graph<T>::process() {
 
 template <typename T>
 Graph<T>::~Graph() {
-    // Opcional: Gestão de memória se o Graph for dono dos ponteiros dos nós
+    for (auto* node : nodes) {
+        delete node;
+    }
+
+    nodes.clear();
+    edges.clear();
+    execution_layers.clear();
+    sccs.clear();
 }
 
 // ==========================================

@@ -109,6 +109,31 @@ public:
     }
 };
 
+class DestructionProbeNode final : public NodeBase<double> {
+public:
+    explicit DestructionProbeNode(int* destruction_count)
+        : destruction_count_(destruction_count) {
+        output_buffers.resize(1, nullptr);
+        output_block_sizes.resize(1, 0);
+        output_sample_rates.resize(1, 0.0);
+    }
+
+    void compute_dimensions() override {}
+
+    void prepare() override {}
+
+    void process() override {}
+
+    ~DestructionProbeNode() override {
+        if (destruction_count_) {
+            ++(*destruction_count_);
+        }
+    }
+
+private:
+    int* destruction_count_;
+};
+
 bool test_zero_copy_routing() {
     Graph<double> graph;
     auto* source = new InspectableSource(5.0);
@@ -142,6 +167,19 @@ bool test_zero_copy_routing() {
     }
 
     return true;
+}
+
+bool test_graph_destroys_owned_nodes() {
+    int destruction_count = 0;
+
+    {
+        Graph<double> graph;
+        graph.add_node(new DestructionProbeNode(&destruction_count));
+        graph.add_node(new DestructionProbeNode(&destruction_count));
+    }
+
+    return expect_true(destruction_count == 2,
+                       "Graph destructor must destroy nodes passed to add_node().");
 }
 
 bool test_topological_order() {
@@ -324,6 +362,7 @@ int main() {
     std::cout << "--- D(SP)^2 : Graph routing test suite ---\n";
 
     if (!test_zero_copy_routing()) return 1;
+    if (!test_graph_destroys_owned_nodes()) return 1;
     if (!test_topological_order()) return 1;
     if (!test_multiple_inputs()) return 1;
     if (!test_fan_out_routing()) return 1;
