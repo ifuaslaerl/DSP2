@@ -8,8 +8,6 @@ O **$D(SP)^2$** é um motor híbrido de processamento digital de sinais (DSP) ba
 * **Dual-Target Build:** Compile para `SIMULATION` (com bindings Pybind11 para orquestração em Python) ou `EMBEDDED` (biblioteca estática para microcontroladores).
 * **Multirate SDF:** Suporte nativo a decimadores e convolução com negociação automática de tamanho de bloco e taxa de amostragem.
 
-# Substitua a seção "## Como Funciona?" inteira (incluindo o bloco de código JSON) no arquivo README.md pelo seguinte trecho:
-
 ## Como Funciona?
 
 O D(SP)^2 permite definir a topologia do seu processamento em um arquivo JSON simples. O motor lê esta estrutura e orquestra a execução de alta performance em C++ utilizando roteamento **Zero-Copy**.
