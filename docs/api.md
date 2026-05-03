@@ -4,18 +4,18 @@ Este documento lista as funções, utilitários matemáticos e classes base disp
 **Nota para Agentes de IA:** Sempre consulte esta lista antes de implementar matemática customizada em um novo nó para reaproveitar código otimizado.
 
 ## 1. Operações de Buffer (SIMD Otimizadas)
-Funções para manipular blocos inteiros de áudio de forma rápida.
+Funções para manipular blocos inteiros de forma rápida.
 
 Toda a matemática de blocos deve ser feita invocando o namespace `DSP2BufferOps`. Estas funções foram estruturadas para garantir o *auto-vectorizing* (SIMD) em -O3, trocando ciclos longos de processador por operações paralelas em hardware.
 
 ### `DSP2BufferOps::add<T>(T* __restrict dest, const T* __restrict src, int size)`
-- **Descrição:** Realiza a soma de dois buffers ponto a ponto. O resultado é acumulado no buffer `dest`. Ideal para mixagem de sinais de áudio.
+- **Descrição:** Realiza a soma de dois buffers ponto a ponto. O resultado é acumulado no buffer `dest`. Ideal para mixagem de sinais.
 
 ### `DSP2BufferOps::multiply<T>(T* __restrict dest, const T* __restrict src, int size)`
 - **Descrição:** Multiplicação ponto a ponto (Modulação em Anel). 
 
 ### `DSP2BufferOps::multiply_scalar<T>(T* dest, T scalar, int size)`
-- **Descrição:** Aplica um ganho/atenuação linear fixo a todo o bloco de áudio.
+- **Descrição:** Aplica um ganho/atenuação linear fixo a todo o bloco.
 
 ### `DSP2BufferOps::clear<T>(T* dest, int size)`
 - **Descrição:** Preenche rapidamente o buffer especificado com zeros estáticos de acordo com a tipagem, sem chamar o memset global que pode ignorar otimizações de FPU.
@@ -29,11 +29,11 @@ Funções trigonométricas e logarítmicas que trocam precisão absoluta por vel
 - **Assinatura:** `inline T get_value(T phase_index) const`
 - **Descrição:** Tabela de pesquisa pré-calculada para geração de senoide.
 - **Configuração:** O tamanho padrão é definido pela constante `DSP2Config::SINE_LUT_DEFAULT_SIZE` em `core/constants.hpp`.
-- **Notas de Performance:** Implementação $O(1)$ sem chamadas de `std::sin` no loop de áudio. Utiliza `DSP2Config::PI` (calculado via `std::acos(-1)`) para a geração inicial da tabela.
+- **Notas de Performance:** Implementação $O(1)$ sem chamadas de `std::sin` no loop. Utiliza `DSP2Config::PI` (calculado via `std::acos(-1)`) para a geração inicial da tabela.
 
 ## 3. Sistema de Logging (Zero-Cost / Lock-Free)
 
-Para enviar avisos ou capturar exceções matemáticas em tempo real para a interface Python sem causar gargalos na thread de áudio, utilize as macros do Core Logger. Elas usam um SPSC Ring Buffer sob o capô, garantindo segurança lock-free de O(1).
+Para enviar avisos ou capturar exceções matemáticas em tempo real para a interface Python sem causar gargalos na thread, utilize as macros do Core Logger. Elas usam um SPSC Ring Buffer sob o capô, garantindo segurança lock-free de O(1).
 
 ### Macros de Log:
 * **`DSP2_LOG_INFO("Sua mensagem aqui");`**
@@ -49,10 +49,10 @@ As funções abaixo estão disponíveis no módulo Python `dsp2._dsp2_core`.
 
 ### `get_logs() -> List[LogEvent]`
 - **Descrição:** Ponto de entrada para o mecanismo de Polling do Python. Retorna todos os logs que foram emitidos pelo C++ desde a última chamada.
-- **Uso Recomendado:** Chamar em um loop assíncrono ou thread de interface no Python para monitorar a saúde do motor sem interferir na thread de áudio.
+- **Uso Recomendado:** Chamar em um loop assíncrono ou thread de interface no Python para monitorar a saúde do motor sem interferir na thread principal.
 
 ### `Engine` (Binding)
-- **Métodos:** `set_audio_parameters`, `prepare_engine`, `process_block`.
+- **Métodos:** `set_signal_parameters`, `prepare_engine`, `process_block`.
 - **Tipo:** Instanciado em Python para rodar a simulação com precisão de 64-bits (`double`).
 
 ## 5. NodeFactory e Criação Dinâmica (Fase 3.3)

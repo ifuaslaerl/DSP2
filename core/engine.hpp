@@ -27,7 +27,7 @@ public:
     // Configuração
     // ==========================================
 
-    void set_audio_parameters(double sample_rate, int block_size);
+    void set_signal_parameters(double sample_rate, int block_size);
     
     // ==========================================
     // Inicialização do Motor

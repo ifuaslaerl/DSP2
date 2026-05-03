@@ -1,10 +1,36 @@
-# $D(SP)^2$
+# $D(SP)^2$ - Digital Signal Processing Simulation Program
 
-## Digital Signal Processing Simulation Program
+O **$D(SP)^2$** é um motor híbrido de processamento digital de sinais (DSP) baseado em grafos (Dataflow). Construído com foco absoluto em performance, ele permite prototipar algoritmos em Python (via arquivos JSON) e compilar a mesma lógica matematicamente rigorosa para sistemas embarcados (C++ puro).
 
-$D(SP)^2$ É uma ferramenta feita para auxiliar a prototipagem de sistemas de processamento digital de sinais, com arquitetura modular, escalável e suporte nativo para embarcar a modelagem.
+## Principais Features
+* **Zero-Copy Routing:** Passagem de buffers por referência, sem cópias na memória.
+* **Hard Real-Time:** Motor C++ livre de locks, sem alocação dinâmica no ciclo principal e com otimizações SIMD (Fast Math).
+* **Dual-Target Build:** Compile para `SIMULATION` (com bindings Pybind11 para orquestração em Python) ou `EMBEDDED` (biblioteca estática para microcontroladores).
+* **Multirate SDF:** Suporte nativo a decimadores e convolução com negociação automática de tamanho de bloco e taxa de amostragem.
 
-## Pré-Requisitos
+## Como Funciona?
+Você define a topologia do seu processamento em um arquivo JSON simples e o motor orquestra a execução de alta performance em C++:
+
+```json
+{
+    "nodes": [
+        { "name": "Osc_A", "type": "SineOscillator", "parameters": { "frequency": 440.0 } },
+        { "name": "Osc_B", "type": "SineOscillator", "parameters": { "frequency": 220.0 } },
+        { "name": "Mixer", "type": "Add" },
+        { "name": "RingMod", "type": "Multiply" }
+    ],
+    "edges": [
+        { "source": "Osc_A", "source_port": 0, "dest": "Mixer", "dest_port": 0 },
+        { "source": "Osc_B", "source_port": 0, "dest": "Mixer", "dest_port": 1 },
+        { "source": "Osc_A", "source_port": 0, "dest": "RingMod", "dest_port": 0 },
+        { "source": "Osc_B", "source_port": 0, "dest": "RingMod", "dest_port": 1 }
+    ]
+}
+```
+
+## Configuração do Ambiente (Docker)
+
+### Pré-Requisitos
 
 O workflow oficial do projeto é único para toda a equipa:
 
@@ -18,9 +44,9 @@ Para isso, o host precisa ter:
 - Docker Compose V2 (`docker compose`)
 - Linux nativo ou WSL 2
 
-## Configuração do Host
+### Configuração do Host
 
-### Linux nativo
+#### Linux nativo
 
 Instale o Docker Engine e o plugin Compose V2 usando o gestor de pacotes da sua distribuição ou as instruções oficiais do Docker.
 
@@ -34,7 +60,7 @@ docker info
 
 Se o seu utilizador não tiver acesso ao socket do Docker, use `sudo` ou ajuste as permissões do grupo `docker` de acordo com a sua distribuição.
 
-### WSL 2
+#### WSL 2
 
 Este repositório suporta desenvolvimento a partir de uma distro WSL 2, desde que o Docker Engine e o Compose V2 estejam instalados dentro da própria distro.
 
@@ -57,14 +83,14 @@ docker info
 docker compose version
 ```
 
-## Clonar o repositório
+### Clonar o repositório
 
 ```bash
 git clone https://github.com/ifuaslaerl/DSP2.git
 cd DSP2
 ```
 
-## Subir o ambiente de desenvolvimento
+### Subir o ambiente de desenvolvimento
 
 Na raiz do repositório, execute:
 
@@ -80,7 +106,7 @@ docker compose exec dsp2-env bash
 
 Se o seu host exigir privilégios para aceder ao Docker, prefixe os comandos com `sudo`.
 
-## Uso diário
+### Uso diário
 
 Depois que o Docker do host estiver configurado, o fluxo normal de trabalho é:
 
@@ -95,7 +121,7 @@ Notas práticas:
 - Você não precisa reinstalar Docker, Compose ou repetir `newgrp docker` em todo uso.
 - Em WSL 2, `sudo service docker start` pode ser necessário em uma nova sessão se o daemon não subir sozinho.
 
-## Compilação
+### Compilação
 
 O nosso sistema de compilação utiliza o CMake e está dividido em dois alvos principais: a simulação com *bindings* em Python e a biblioteca estática em C++ para sistemas embarcados. 
 
@@ -103,7 +129,7 @@ Regra de ouro: nunca compile o código diretamente na raiz do projeto. Crie semp
 
 Todos os comandos abaixo devem ser executados dentro do contêiner.
 
-### Compilar para Simulação
+#### Compilar para Simulação
 Este é o modo predefinido. Ele compila a matemática do *core* e gera a biblioteca partilhada (`.so`) através do `pybind11`, permitindo que o Python construa o grafo e orquestre o motor.
 
 Dentro do shell do contêiner, execute:
@@ -116,7 +142,7 @@ cmake -DDSP2_TARGET=SIMULATION ..
 make
 ```
 
-### Compilar para Sistema Embarcado
+#### Compilar para Sistema Embarcado
 
 Este modo isola o C++ de qualquer dependência do Sistema Operativo ou do Python. Ele ignora a pasta bindings/ e gera apenas a biblioteca estática (libdsp2_core.a) que será posteriormente incluída no firmware do microcontrolador.
 
@@ -130,7 +156,7 @@ cmake -DDSP2_TARGET=EMBEDDED ..
 make
 ```
 
-### Rodar os testes
+#### Rodar os testes
 
 Após compilar o alvo embarcado, rode:
 
@@ -141,7 +167,7 @@ make test
 
 Se as pastas `build-sim` e `build-embedded` já existirem, não é preciso recriá-las; entre nelas e rode `make` ou `make test` conforme necessário.
 
-## Primeira validação recomendada
+### Primeira validação recomendada
 
 Para verificar se o ambiente ficou funcional no seu host:
 
@@ -166,6 +192,6 @@ make
 make test
 ```
 
-## Nota sobre Linux com SELinux
+### Nota sobre Linux com SELinux
 
 O `docker-compose.yaml` usa o bind mount portável `.:/app` para funcionar tanto em Linux como em WSL 2. Se algum host Linux com SELinux precisar de rotulagem explícita de volume, esse ajuste deve ser feito localmente nesse host, sem alterar o workflow principal do projeto.

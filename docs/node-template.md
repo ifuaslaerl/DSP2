@@ -27,7 +27,7 @@ public:
         // Ex: this->output_buffers[0] = new T[blockSize];
     }
 
-    // Função de processamento de áudio crítica (Tempo Real)
+    // Função de processamento crítica (Tempo Real)
     void process() override {
         // ----------------------------------------------------
         // 1. PROIBIDO: std::sin, std::exp (use Fast Math do core)

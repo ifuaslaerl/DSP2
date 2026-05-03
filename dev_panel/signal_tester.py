@@ -16,7 +16,7 @@ class DSP2TestHarness:
         self.sample_rate = sample_rate
         self.block_size = block_size
         self.engine = core.Engine()
-        self.engine.set_audio_parameters(self.sample_rate, self.block_size)
+        self.engine.set_signal_parameters(self.sample_rate, self.block_size)
         self.node_ids = {}
 
     def load_graph(self, json_path):

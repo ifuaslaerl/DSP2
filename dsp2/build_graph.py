@@ -18,7 +18,7 @@ class DSP2Orchestrator:
         self.log_thread = None
         
         # Consome as constantes globais
-        self.engine.set_audio_parameters(DEFAULT_SAMPLE_RATE, DEFAULT_BLOCK_SIZE)
+        self.engine.set_signal_parameters(DEFAULT_SAMPLE_RATE, DEFAULT_BLOCK_SIZE)
 
     def _poll_logs(self):
         """

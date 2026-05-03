@@ -16,13 +16,13 @@
 ### Fase 4: Implementação e Diversificação de Vértices (Módulos DSP)
 * **4.1. Vértices de Alta Performance (`nodes_cpp/`):** Escrever os vértices pesados (Filtros Biquad, Reverbs, FFT) em C++ puro, respeitando as proibições de alocação dinâmica e RTTI.
 * **4.2. Vértices de Prototipagem Rápida (`dsp2/nodes_py/`):** Desenvolver vértices em Python. Apesar de não serem tão performáticos quanto os de C++, são perfeitos para testar ideias de controlo, interfaces de IA e automações na simulação.
-* **4.3. Sistema de Probes (Tap Points):** Implementar nós de interceptação baseados no sistema de Probes do AV-Scope. Permite copiar dados intermediários do sinal para visualização sem violar a imutabilidade dos buffers Zero-Copy.
+* **4.3. Sistema de Probes (Tap Points):** Implementar nós de interceptação. Permite copiar dados intermediários do sinal para visualização sem violar a imutabilidade dos buffers Zero-Copy.
 
 ### Fase 5: Ferramentas de Teste e Benchmarking
 * **5.1. Painel de Desenvolvimento (`dev_panel/`):** Construir os scripts de validação como o `signal_tester.py` para inspecionar gráficos em `plots/` e ficheiros `.wav` nas saídas e Integrar a leitura de logs nos scripts de validação (como o signal_tester.py), exibindo métricas e alertas de erros matemáticos capturados pelo C++ durante as simulações..
 * **5.2. Análise Híbrida (`run_benchmark.py`):** Medir o impacto temporal e a assimetria entre chamar a função `process()` num vértice C++ versus num vértice sobrecarregado no Python.
-* **5.3. Simulador de Fluxo de Arquivos (Dual Mode):** Adaptar a lógica de *File Throttling* (`FilePlaybackStream`) do AV-Scope, permitindo que arquivos de áudio (.wav) sejam processados pelo motor C++ mimetizando o tempo real de hardware cadenciado.
-* **5.4. Visualização PyQtGraph:** Integrar os widgets `ScopeGraph`, layouts de auto-grade e detectores do AV-Scope para monitoramento visual acelerado por GPU no painel de desenvolvimento.
+* **5.3. Simulador de Fluxo de Arquivos (Dual Mode):** permitir que arquivos sejam processados pelo motor C++ mimetizando o tempo real de hardware cadenciado.
+* **5.4. Visualização PyQtGraph:** Integrar os widgets `ScopeGraph`, layouts de auto-grade e detectores para monitoramento visual acelerado por GPU no painel de desenvolvimento.
 
 ### Fase 6: Homologação para Embarcados (Corte Limpo)
 * **6.1. Compilação do Núcleo Rigoroso:** Configurar a submissão com `DSP2_TARGET=EMBEDDED`. Isto assegura que todos os vértices escritos em Python são ignorados e apenas a matemática rigorosa de `nodes_cpp/` segue para o microcontrolador.

@@ -57,7 +57,7 @@ Engine<T>::~Engine() {
 // ==========================================
 
 template <typename T>
-void Engine<T>::set_audio_parameters(double sample_rate, int block_size) {
+void Engine<T>::set_signal_parameters(double sample_rate, int block_size) {
     sampleRate = sample_rate;
     blockSize = block_size;
 }

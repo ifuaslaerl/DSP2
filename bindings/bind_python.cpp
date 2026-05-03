@@ -46,7 +46,7 @@ PYBIND11_MODULE(_dsp2_core, m) {
     // Vinculamos a versão <double> para uso no Python/Simulação
     py::class_<Engine<double>>(m, "Engine")
         .def(py::init<>())
-        .def("set_audio_parameters", &Engine<double>::set_audio_parameters)
+        .def("set_signal_parameters", &Engine<double>::set_signal_parameters)
         .def("prepare_engine", &Engine<double>::prepare_engine)
         .def("process_block", &Engine<double>::process_block)
         .def("add_node", &Engine<double>::add_node, "Adiciona um nó pelo nome da classe e retorna seu ID interno")

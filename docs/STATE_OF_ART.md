@@ -8,8 +8,8 @@ O sistema foi concebido para ambientes de alta performance e sistemas embarcados
 
 *   **Separação de Fases (Alocação vs. Tempo Real):**
     *   **Fase de Setup (`prepare()`):** Ocorre durante a inicialização. É o **único** local onde a alocação dinâmica de memória (`new`, `malloc`) é permitida.
-    *   **Fase de Processamento (`process()`):** Ocorre no loop de áudio. São proibidas invocações ao *heap*, lançamentos de exceções, locks bloqueantes e chamadas à biblioteca `<cmath>`.
-*   **Zero-Copy Routing:** Os buffers de áudio fluem entre nós por referência. É estritamente proibido um nó alterar o seu `input_buffer`. O roteamento aponta a entrada de destino diretamente para o endereço de saída da origem.
+    *   **Fase de Processamento (`process()`):** Ocorre no loop de principal. São proibidas invocações ao *heap*, lançamentos de exceções, locks bloqueantes e chamadas à biblioteca `<cmath>`.
+*   **Zero-Copy Routing:** Os buffers fluem entre nós por referência. É estritamente proibido um nó alterar o seu `input_buffer`. O roteamento aponta a entrada de destino diretamente para o endereço de saída da origem.
 *   **Auto-Vetorização (SIMD):** As operações matemáticas em bloco utilizam ponteiros com o modificador `__restrict`, garantindo que o compilador aplica otimizações vetoriais em paralelo sob a flag `-O3`.
 
 ## 2. A Infraestrutura do Motor e Grafo (api.md)
@@ -27,7 +27,7 @@ A orquestração do pipeline é movida a dados (Data-Driven), separando a lógic
 
 ## 4. Catálogo de Nós Processadores (Fase 4.1 Concluída)
 
-Os nós encontram-se em `nodes_cpp/` e são integralmente tipados (`template <typename T>`) para operar tanto em Simulação (`double`) como em Microcontroladores (`float`). Operam de forma **Híbrida**: a matemática combina valores base (via JSON) com modulação de áudio (via Dataflow).
+Os nós encontram-se em `nodes_cpp/` e são integralmente tipados (`template <typename T>`) para operar tanto em Simulação (`double`) como em Microcontroladores (`float`). Operam de forma **Híbrida**: a matemática combina valores base (via JSON) com modulação (via Dataflow).
 
 *   **Nós Matemáticos Otimizados (`math_nodes.hpp`):**
     *   `Add`: Mixer de somatória ponto a ponto para fusão de caminhos.
@@ -64,7 +64,7 @@ Sempre que criar um novo nó (ex: em `nodes_cpp/`), o cabeçalho da classe e os 
 
 **O que documentar obrigatoriamente:**
 1.  **A Classe:** O que o nó faz (o seu propósito matemático ou de processamento).
-2.  **O Construtor:** Quais são as portas (Ports) de entrada (ex: Modulação de Frequência, Áudio) e saída. Isto é crucial para que quem constrói o JSON saiba o que rotear para o `dest_port` e `source_port`.
+2.  **O Construtor:** Quais são as portas (Ports) de entrada (ex: Modulação de Frequência) e saída. Isto é crucial para que quem constrói o JSON saiba o que rotear para o `dest_port` e `source_port`.
 3.  **O `set_parameter`:** Que parâmetros o nó aceita (ex: "frequency", "gain", "cutoff").
 4.  **O `prepare` e `process`:** Documentar as proibições do `AGENTS.md` para lembrar os desenvolvedores de não alocarem memória no `process`.
 
@@ -81,7 +81,7 @@ Aqui está um exemplo de como o código deve ser documentado usando comentários
  * respeitando as regras de processamento em tempo real (Zero-Allocation).
  *
  * @note Entradas:
- *       - Porta 0: Sinal de Áudio Principal
+ *       - Porta 0: Sinal Principal
  *       - Porta 1: (Opcional) Modulação do Cutoff (CV)
  *       Saídas:
  *       - Porta 0: Sinal Filtrado
@@ -119,7 +119,7 @@ public:
     }
 
     /**
-     * @brief Executa o processamento matemático do bloco de áudio.
+     * @brief Executa o processamento matemático do bloco.
      * @warning NUNCA aloque memória ou use locks/IO dentro desta função!
      *          Utilize ponteiros __restrict para garantir a auto-vetorização (SIMD).
      */

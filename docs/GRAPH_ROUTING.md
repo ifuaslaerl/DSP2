@@ -1,6 +1,6 @@
 # Guia de Roteamento de Grafo (JSON)
 
-O $D(SP)^2$ permite a construção visual e orientada a dados de pipelines de áudio. A topologia do grafo é definida em um arquivo JSON e lida pelo `GraphLoader` em Python.
+O $D(SP)^2$ permite a construção visual e orientada a dados de pipelines. A topologia do grafo é definida em um arquivo JSON e lida pelo `GraphLoader` em Python.
 
 ## Estrutura do JSON
 
@@ -21,13 +21,16 @@ O motor C++ utiliza roteamento **Zero-Copy**. Isso significa que conectar um cab
 ```json
 {
     "nodes": [
-        { "name": "GeradorDeOnda", "type": "DummyGenerator" },
-        { "name": "LFO_Volume", "type": "DummyGenerator" },
-        { "name": "VCA_Master", "type": "DummyMultiplier" }
+        { "name": "Osc_A", "type": "SineOscillator", "parameters": { "frequency": 440.0 } },
+        { "name": "Osc_B", "type": "SineOscillator", "parameters": { "frequency": 220.0 } },
+        { "name": "Mixer", "type": "Add" },
+        { "name": "RingMod", "type": "Multiply" }
     ],
     "edges": [
-        { "source": "GeradorDeOnda", "source_port": 0, "dest": "VCA_Master", "dest_port": 0 },
-        { "source": "LFO_Volume", "source_port": 0, "dest": "VCA_Master", "dest_port": 1 }
+        { "source": "Osc_A", "source_port": 0, "dest": "Mixer", "dest_port": 0 },
+        { "source": "Osc_B", "source_port": 0, "dest": "Mixer", "dest_port": 1 },
+        { "source": "Osc_A", "source_port": 0, "dest": "RingMod", "dest_port": 0 },
+        { "source": "Osc_B", "source_port": 0, "dest": "RingMod", "dest_port": 1 }
     ]
 }
 ```
@@ -40,7 +43,7 @@ import dsp2._dsp2_core as core
 from dsp2.graph_loader import GraphLoader
 
 engine = core.Engine()
-engine.set_audio_parameters(44100.0, 256)
+engine.set_signal_parameters(44100.0, 256)
 
 # 1. Carrega a topologia do JSON
 GraphLoader.load_from_json(engine, 'test_graph.json')
@@ -48,6 +51,6 @@ GraphLoader.load_from_json(engine, 'test_graph.json')
 # 2. Compila o grafo no C++ (resolve topologia e aloca memória Zero-Copy)
 engine.prepare_engine()
 
-# 3. Roda o ciclo de áudio
+# 3. Roda o ciclo principal
 # for _ in range(blocos): engine.process_block()
 ```

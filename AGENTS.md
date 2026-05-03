@@ -8,18 +8,18 @@ Sempre que você for criar, modificar ou analisar um nó (node) de processamento
 O D(SP)^2 funciona através de um grafo direcionado onde cada "nó" representa uma operação matemática ou de DSP.
 
 * **Estrutura do Nó:** Todo novo nó C++ deve herdar da classe base `NodeBase<T>` e implementar obrigatoriamente a função de processamento `process()`.
-* **Entradas e Saídas:** Os nós se comunicam passando buffers de áudio/sinais de tamanho fixo. As entradas devem ser declaradas no construtor do nó.
+* **Entradas e Saídas:** Os nós se comunicam passando buffers de sinais de tamanho fixo. As entradas devem ser declaradas no construtor do nó.
 * **Ausência de Estado Global:** Os nós devem ser autocontidos. Não utilize variáveis globais para armazenar estados (como delays ou fases de osciladores); todo o estado interno deve pertencer à instância da classe do nó.
 * **Imutabilidade:** É estritamente proibido que um nó modifique os dados do seu buffer de entrada. A passagem de sinal entre arestas é feita por referência de memória (Zero-Copy). Para garantir isto, as entradas na classe base (`core/node_base.hpp`) e nos nós herdeiros devem ser sempre ponteiros constantes, armazenados em `std::vector<const T*> input_buffers`. Qualquer tentativa de reescrever uma entrada deve ser tratada como erro de arquitetura. Os nós apenas podem escrever nos seus próprios `T* output_buffers`.
 
 ## 2. Restrições de Performance e Sistema Embarcado
-Como este é um motor de processamento de sinais de áudio/tempo real, a performance e o determinismo são críticos. Dentro do loop de processamento de áudio (a função que processa os buffers amostra por amostra):
+Como este é um motor de processamento de sinais de tempo real, a performance e o determinismo são críticos. Dentro do loop de processamento (a função que processa os buffers amostra por amostra):
 
 * **PROIBIDO Alocação Dinâmica de Memória:** Nunca use `new`, `malloc`, ou instancie novos `std::vector` ou arrays estáticos dentro do loop de processamento. Toda a alocação de memória (buffers, janelas de FFT, arrays de delay) DEVE ser feita durante a inicialização (no construtor ou no método `prepare()`).
 * **Operações Pesadas:** Evite chamadas de sistema, I/O de disco (`printf`/`std::cout`), ou locks de mutex bloqueantes dentro do bloco de processamento.
 * **Vetorização:** Sempre que possível, estruture os loops matemáticos de forma que o compilador consiga aplicar otimizações de SIMD (vetorização).
 * **PROIBIDO Exceções e RTTI:** O alvo `EMBEDDED` é compilado com `-fno-exceptions` e `-fno-rtti`. O uso de `try/catch` ou `dynamic_cast` está estritamente proibido em todo o repositório C++. Em caso de falha de validação, retorne códigos de erro (enums) ou utilize retornos vazios.
-* **PROIBIDO Biblioteca Matemática Padrão:** Não utilize funções da `<cmath>` (ex: `std::sin`, `std::exp`, `std::log`) dentro do loop de áudio. Utilize apenas as funções de "Fast Math" e Lookup Tables (LUTs) fornecidas na API do Core.
+* **PROIBIDO Biblioteca Matemática Padrão:** Não utilize funções da `<cmath>` (ex: `std::sin`, `std::exp`, `std::log`) dentro do loop de processamento. Utilize apenas as funções de "Fast Math" e Lookup Tables (LUTs) fornecidas na API do Core.
 * **Tipagem Genérica (Templates):** Todo nó deve ser escrito como `template <typename T>` para suportar processamento em `double` (Simulação/Python) e `float` (Hardware/Microcontrolador).
 * **Modo Mínimo (Macros de Profiling):** Qualquer código destinado a medir tempo de execução, uso de memória ou debug para enviar ao Python deve ser encapsulado num bloco `#ifndef DSP2_EMBEDDED_MODE`.
 
@@ -44,7 +44,7 @@ O projeto é conteinerizado para garantir a reprodutibilidade da compilação do
 * **Hardware:** O acesso ao hardware é mapeado pelo Docker via diretiva `devices`. Se um novo hardware for adicionado, instrua o usuário a atualizar o `docker-compose.yaml`.
 
 ## 6. Sistema de Logging e Debug (Tempo Real)
-A depuração entre a ponte C++ e Python não deve comprometer a performance do motor de áudio. Se precisar criar logs ou rastrear erros matemáticos dentro da função `process()` de um nó, **NÃO USE** `std::cout`, `printf` ou ferramentas padrão. Você deve utilizar o Logger Nativo do Core.
+A depuração entre a ponte C++ e Python não deve comprometer a performance do motor. Se precisar criar logs ou rastrear erros matemáticos dentro da função `process()` de um nó, **NÃO USE** `std::cout`, `printf` ou ferramentas padrão. Você deve utilizar o Logger Nativo do Core.
 
 Ao trabalhar com o sistema de *logs* do $D(SP)^2$, siga RIGOROSAMENTE estas 4 regras:
 
