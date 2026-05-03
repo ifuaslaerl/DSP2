@@ -9,31 +9,31 @@ class GraphLoader:
         with open(filepath, 'r') as f:
             data = json.load(f)
             
-        node_ids = {} # Dicionário (Nome Visual -> ID do C++)
+        node_ids = {} # Dicionario (Nome Visual -> ID do C++)
         
-        # 1. Instanciar Nós no Engine C++
+        # 1. Instanciar Nos no Engine C++
         for node in data.get('nodes', []):
             name = node['name']
             node_type = node['type']
             
             node_id = engine.add_node(node_type)
             if node_id == -1:
-                raise ValueError(f"Erro ao instanciar nó '{name}'. O tipo '{node_type}' não existe no core C++.")
+                raise ValueError(f"Erro ao instanciar no '{name}'. O tipo '{node_type}' nao existe no core C++.")
                 
             node_ids[name] = node_id
-            print(f" -> Nó alocado C++: {name} ({node_type}) | ID: {node_id}")
+            print(f" -> No alocado C++: {name} ({node_type}) | ID: {node_id}")
             
-            # [NOVO] Leitura Inteligente de Parâmetros (Escalares vs Arrays)
+            # [NOVO] Leitura Inteligente de Parametros (Escalares vs Arrays)
             if 'parameters' in node:
                 for param_name, value in node['parameters'].items():
                     if isinstance(value, list):
                         # Se for uma lista no JSON, envia como Array para o C++
                         engine.set_node_parameter_array(node_id, param_name, value)
-                        print(f"    - Parâmetro Array configurado: {param_name} = (Tamanho: {len(value)})")
+                        print(f"    - Parametro Array configurado: {param_name} = (Tamanho: {len(value)})")
                     else:
-                        # Se for um número único, envia o double normal
+                        # Se for um numero unico, envia o double normal
                         engine.set_node_parameter(node_id, param_name, float(value))
-                        print(f"    - Parâmetro Escalar configurado: {param_name} = {value}")
+                        print(f"    - Parametro Escalar configurado: {param_name} = {value}")
 
         # 2. Conectar as Arestas (Zero-Copy routing + Multirate SDF)
         for edge in data.get('edges', []):

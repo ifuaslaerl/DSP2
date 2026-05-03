@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Garante que o Python encontra o módulo dsp2 na raiz do projeto
+# Garante que o Python encontra o modulo dsp2 na raiz do projeto
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import dsp2._dsp2_core as core
@@ -21,21 +21,21 @@ class DSP2TestHarness:
 
     def load_graph(self, json_path):
         if not os.path.exists(json_path):
-            raise FileNotFoundError(f"Erro: O ficheiro JSON '{json_path}' não foi encontrado.")
+            raise FileNotFoundError(f"Erro: O ficheiro JSON '{json_path}' nao foi encontrado.")
         self.node_ids = GraphLoader.load_from_json(self.engine, json_path)
 
     def run_and_capture(self, num_blocks):
-        print(f"[Tester] A preparar memória C++ para {num_blocks} blocos...")
+        print(f"[Tester] A preparar memoria C++ para {num_blocks} blocos...")
         self.engine.prepare_engine()
 
-        # Dicionário para armazenar o sinal contínuo de cada nó
+        # Dicionario para armazenar o sinal continuo de cada no
         captured_data = {name: [] for name in self.node_ids.keys()}
 
         # Ciclo de Tempo Real Simulado
         for i in range(num_blocks):
             self.engine.process_block()
             
-            # Puxa o output de TODOS os nós e concatena
+            # Puxa o output de TODOS os nos e concatena
             for name, node_id in self.node_ids.items():
                 buffer_out = self.engine.get_node_output(node_id, 0)
                 captured_data[name].extend(buffer_out)
@@ -47,7 +47,7 @@ class DSP2TestHarness:
         """Verifica o Logger Lock-Free do C++ em busca de falhas silenciosas."""
         logs = core.get_logs()
         if logs:
-            print("\n[Aviso C++] Foram detetados eventos no motor de áudio:")
+            print("\n[Aviso C++] Foram detetados eventos no motor de audio:")
             for log in logs:
                 level_str = "INFO" if log.level == core.LogLevel.INFO else "ERROR"
                 print(f" -> [{level_str}] {log.message}")
@@ -57,28 +57,28 @@ class DSP2TestHarness:
     def plot_results(self, data, output_path):
         num_nodes = len(data)
         if num_nodes == 0:
-            print("Nenhum dado capturado para gerar o gráfico.")
+            print("Nenhum dado capturado para gerar o grafico.")
             return
 
-        # Ajusta a altura da imagem dinamicamente com base no número de nós
+        # Ajusta a altura da imagem dinamicamente com base no numero de nos
         fig, axs = plt.subplots(num_nodes, 1, figsize=(12, 2.5 * num_nodes), sharex=True)
-        fig.suptitle(f'D(SP)^2 - Inspeção Universal do Grafo', fontsize=14)
+        fig.suptitle(f'D(SP)^2 - Inspecao Universal do Grafo', fontsize=14)
 
-        # Garante que axs seja iterável mesmo se houver apenas 1 nó
+        # Garante que axs seja iteravel mesmo se houver apenas 1 no
         if num_nodes == 1:
             axs = [axs]
 
         colors = plt.cm.tab10(np.linspace(0, 1, num_nodes))
 
-        # Gera os sub-gráficos dinamicamente
+        # Gera os sub-graficos dinamicamente
         for ax, (node_name, signal), color in zip(axs, data.items(), colors):
-            # 1. Descobre o ID do nó usando o dicionário da classe
+            # 1. Descobre o ID do no usando o dicionario da classe
             node_id = self.node_ids[node_name]
             
             # 2. Puxa a taxa de amostragem real negociada no C++ (SDF Multirate)
             sample_rate = self.engine.get_node_output_sample_rate(node_id, 0)
             
-            # 3. Aplica a física (t = n / Fs) se a taxa for válida
+            # 3. Aplica a fisica (t = n / Fs) se a taxa for valida
             if sample_rate > 0 and len(signal) > 0:
                 time_axis = np.arange(len(signal)) / sample_rate
                 ax.plot(time_axis, signal, color=color, label=f"{node_name} (Fs: {sample_rate}Hz)")
@@ -95,13 +95,13 @@ class DSP2TestHarness:
         
         plt.tight_layout()
         plt.savefig(output_path)
-        print(f"\n[Tester] Validação visual guardada em: {output_path}")
+        print(f"\n[Tester] Validacao visual guardada em: {output_path}")
 
 def main():
     parser = argparse.ArgumentParser(description="Test Harness Robusto para o D(SP)^2")
     parser.add_argument("-g", "--graph", type=str, required=True, help="Caminho para o ficheiro JSON do grafo")
-    parser.add_argument("-o", "--output", type=str, default="dev_panel/test_output.png", help="Caminho de destino do gráfico (ex: result.png)")
-    parser.add_argument("-b", "--blocks", type=int, default=1, help="Número de blocos de áudio a processar")
+    parser.add_argument("-o", "--output", type=str, default="dev_panel/test_output.png", help="Caminho de destino do grafico (ex: result.png)")
+    parser.add_argument("-b", "--blocks", type=int, default=1, help="Numero de blocos de audio a processar")
     parser.add_argument("-sr", "--samplerate", type=float, default=DEFAULT_SAMPLE_RATE, help="Taxa de Amostragem (Sample Rate)")
     parser.add_argument("-bs", "--blocksize", type=int, default=DEFAULT_BLOCK_SIZE, help="Tamanho do Bloco (Block Size)")
     
@@ -114,7 +114,7 @@ def main():
         data = tester.run_and_capture(args.blocks)
         tester.plot_results(data, args.output)
     except Exception as e:
-        print(f"\n[Falha Crítica] {e}")
+        print(f"\n[Falha Critica] {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

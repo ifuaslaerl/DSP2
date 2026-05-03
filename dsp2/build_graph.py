@@ -46,15 +46,15 @@ class DSP2Orchestrator:
         # prepare aloca buffers e solda os ponteiros Zero-Copy no C++.
         GraphLoader.load_from_json(self.engine, DEFAULT_GRAPH_PATH)
 
-        print("[Python] Preparando Engine (Alocação de Memória C++)...")
+        print("[Python] Preparando Engine (Alocacao de Memoria C++)...")
         self.engine.prepare_engine()
 
-        # Inicia a thread de monitorização de Logs
+        # Inicia a thread de monitorizacao de Logs
         self.is_running = True
         self.log_thread = threading.Thread(target=self._poll_logs, daemon=True)
         self.log_thread.start()
 
-        print(f"[Python] Iniciando processamento de áudio ({duration_seconds}s)...")
+        print(f"[Python] Iniciando processamento de audio ({duration_seconds}s)...")
         
         # Calcula blocos com base nas constantes
         total_blocks = int((duration_seconds * DEFAULT_SAMPLE_RATE) / DEFAULT_BLOCK_SIZE)
@@ -62,7 +62,7 @@ class DSP2Orchestrator:
         try:
             # LOOP DE TEMPO REAL (Simulado em Python)
             for _ in range(total_blocks):
-                # O C++ processa a matemática do bloco
+                # O C++ processa a matematica do bloco
                 self.engine.process_block()
                 
                 # Simula o tempo do hardware
