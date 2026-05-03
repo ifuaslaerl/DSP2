@@ -144,14 +144,38 @@ make
 
 #### Rodar os testes
 
-Após compilar o alvo embarcado, rode:
+Os testes C++ ficam em `tests/test_*.cpp` e são registados automaticamente no CTest pelo CMake. Sempre que adicionar um novo arquivo de teste, rode novamente o passo `cmake ...` para a lista de testes ser atualizada.
+
+Validação rápida do alvo embarcado:
 
 ```bash
-cd build-embedded
+cd /app
+cmake -S /app -B /app/build-embedded -DDSP2_TARGET=EMBEDDED
+cmake --build /app/build-embedded
+ctest --test-dir /app/build-embedded --output-on-failure
+```
+
+Validação completa antes de commits que mexem no core, no grafo ou em nós C++:
+
+```bash
+cd /app
+cmake -S /app -B /app/build-embedded -DDSP2_TARGET=EMBEDDED
+cmake --build /app/build-embedded
+ctest --test-dir /app/build-embedded --output-on-failure
+
+cmake -S /app -B /app/build-sim -DDSP2_TARGET=SIMULATION
+cmake --build /app/build-sim
+ctest --test-dir /app/build-sim --output-on-failure
+```
+
+Se preferir estar dentro da pasta de build, `make test` também funciona após compilar:
+
+```bash
+cd /app/build-embedded
 make test
 ```
 
-Se as pastas `build-sim` e `build-embedded` já existirem, não é preciso recriá-las; entre nelas e rode `make` ou `make test` conforme necessário.
+Se as pastas `build-sim` e `build-embedded` já existirem, não é preciso recriá-las; rode novamente `cmake`, `cmake --build` e `ctest` conforme necessário.
 
 ### Primeira validação recomendada
 
