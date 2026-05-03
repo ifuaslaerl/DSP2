@@ -24,7 +24,7 @@ struct Edge {
 template <typename T>
 class Graph {
     private:
-        // O armazenamento principal dos nós e das ligações
+        // O Graph e dono dos ponteiros em nodes e os libera no destrutor.
         vector<NodeBase<T>*> nodes;
         vector<Edge> edges;
 
@@ -74,12 +74,20 @@ class Graph {
 
     public:
         Graph() = default;
+        Graph(const Graph&) = delete;
+        Graph& operator=(const Graph&) = delete;
         ~Graph();
 
         // ==========================================
         // Construção do Grafo (Fase de Setup)
         // ==========================================
 
+        /**
+         * @brief Adiciona um no ao grafo e transfere ownership para o Graph.
+         *
+         * O ponteiro deve apontar para um no alocado dinamicamente. Apos esta
+         * chamada, o chamador nao deve liberar nem reutilizar o ponteiro como owner.
+         */
         void add_node(NodeBase<T>* node);
         
         void add_edge(int source_id, int source_port, int dest_id, int dest_port);

@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <type_traits>
 #include <vector>
 
 #include "../core/engine.hpp"
@@ -9,6 +10,11 @@
 namespace {
 
 constexpr double kTolerance = 1e-9;
+
+static_assert(!std::is_copy_constructible<Graph<double>>::value,
+              "Graph must not be copy constructible because it owns node pointers.");
+static_assert(!std::is_copy_assignable<Graph<double>>::value,
+              "Graph must not be copy assignable because it owns node pointers.");
 
 bool nearly_equal(double a, double b, double tolerance = kTolerance) {
     return std::abs(a - b) <= tolerance;
