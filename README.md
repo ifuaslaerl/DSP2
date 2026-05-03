@@ -146,16 +146,25 @@ make
 
 Os testes C++ ficam em `tests/test_*.cpp` e são registados automaticamente no CTest pelo CMake. Sempre que adicionar um novo arquivo de teste, rode novamente o passo `cmake ...` para a lista de testes ser atualizada.
 
-Validação rápida do alvo embarcado:
+O comando padrão antes de commits é o script de verificação completa. A partir do host, rode:
 
 ```bash
-cd /app
-cmake -S /app -B /app/build-embedded -DDSP2_TARGET=EMBEDDED
-cmake --build /app/build-embedded
-ctest --test-dir /app/build-embedded --output-on-failure
+docker compose exec -T dsp2-env bash -lc "scripts/check.sh"
 ```
 
-Validação completa antes de commits que mexem no core, no grafo ou em nós C++:
+Se já estiver dentro do contêiner:
+
+```bash
+scripts/check.sh
+```
+
+Em alguns ambientes Windows/WSL, caso o bit executável não seja preservado no checkout, use:
+
+```bash
+bash scripts/check.sh
+```
+
+O script configura, compila e testa os alvos `EMBEDDED` e `SIMULATION`, incluindo os bindings Python no alvo de simulação. Para debug manual, os comandos equivalentes são:
 
 ```bash
 cd /app
@@ -167,15 +176,6 @@ cmake -S /app -B /app/build-sim -DDSP2_TARGET=SIMULATION
 cmake --build /app/build-sim
 ctest --test-dir /app/build-sim --output-on-failure
 ```
-
-Se preferir estar dentro da pasta de build, `make test` também funciona após compilar:
-
-```bash
-cd /app/build-embedded
-make test
-```
-
-Se as pastas `build-sim` e `build-embedded` já existirem, não é preciso recriá-las; rode novamente `cmake`, `cmake --build` e `ctest` conforme necessário.
 
 ### Primeira validação recomendada
 
