@@ -108,9 +108,32 @@ class Graph {
             return nullptr;
         }
 
+        int get_node_output_size(int node_id, int port) const {
+            if (node_id >= 0 && static_cast<size_t>(node_id) < nodes.size() && 
+                port >= 0 && static_cast<size_t>(port) < nodes[node_id]->output_block_sizes.size()) {
+                return nodes[node_id]->output_block_sizes[port];
+            }
+            return 0;
+        }
+
         void set_node_parameter(int node_id, const std::string& param_name, double value) {
             if (node_id >= 0 && static_cast<size_t>(node_id) < nodes.size()) {
                 nodes[node_id]->set_parameter(param_name, value);
             }
+        }
+
+        void set_node_parameter_array(int node_id, const std::string& param_name, const std::vector<double>& values) {
+            if (node_id >= 0 && static_cast<size_t>(node_id) < nodes.size()) {
+                nodes[node_id]->set_parameter_array(param_name, values);
+            }
+        }
+
+        // Retorna a taxa de amostragem física alocada para a saída de um nó
+        double get_node_output_sample_rate(int node_id, int port) const {
+            if (node_id >= 0 && static_cast<size_t>(node_id) < nodes.size() && 
+                port >= 0 && static_cast<size_t>(port) < nodes[node_id]->output_sample_rates.size()) {
+                return nodes[node_id]->output_sample_rates[port];
+            }
+            return 0.0;
         }
 };

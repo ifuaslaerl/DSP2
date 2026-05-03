@@ -1,59 +1,55 @@
 #pragma once
-
-// Para garantir o modo embarcado sem exceções, evitamos bibliotecas padrão pesadas
 #include <cstdint>
 #include <vector>
 #include <string>
 
-// Forward declaration para que o compilador saiba que a classe Graph existe
-template <typename T> class Graph;
+template <typename T>
+class Graph; // Forward declaration
 
 /**
  * @brief Classe base virtual pura para todos os nós (vértices) de processamento de sinal do DSP2.
- * * Utiliza templates para suportar:
- * - double: Alta precisão para Simulação e prototipagem no Python.
- * - float: Modo EMBEDDED para otimização de performance em microcontroladores.
+ * Agora com suporte a Synchronous Dataflow (SDF) Multirate.
  */
 template <typename T>
 class NodeBase {
-
-    // Conceder acesso privilegiado ao Graph
-    // Isto permite que a função bind_pointers() aceda aos buffers "protected"
     friend class Graph<T>;
 
     protected:
-        // Múltiplas saídas (onde este nó escreve)
-        // O tamanho deste vector é definido no construtor de cada nó específico.
         std::vector<T*> output_buffers;
-
-        // Múltiplas entradas (onde este nó lê - Zero Copy)
-        // O motor vai colocar os ponteiros aqui durante a fase compile()
         std::vector<const T*> input_buffers;
+
+        // [NOVO] Propriedades de Multirate (SDF)
+        std::vector<int> input_block_sizes;
+        std::vector<int> output_block_sizes;
+        std::vector<double> input_sample_rates;
+        std::vector<double> output_sample_rates;
+
     public:
-        // Destrutor virtual padrão para garantir a correta destruição de classes derivadas
         virtual ~NodeBase() = default;
 
         /**
-         * @brief Prepara o nó antes do início do processamento.
-         * * @param sampleRate Taxa de amostragem (ex: 44100.0, 48000.0).
-         * @param blockSize Tamanho do buffer de áudio que será processado por ciclo.
-         * * REGRA DE ARQUITETURA: Este é o ÚNICO local onde é permitida a alocação dinâmica 
-         * de memória (buffers, delay lines, redimensionamento de estruturas).
+         * @brief [NOVO] Fase 1: Negociação de Dimensões.
+         * O nó lê as dimensões que chegaram nas portas de entrada (se houver)
+         * e calcula fisicamente o tamanho e a taxa de amostragem de suas saídas.
          */
-        virtual void prepare(double sampleRate, int blockSize) = 0;
+        virtual void compute_dimensions() = 0;
 
         /**
-         * @brief Função de processamento de áudio (Tempo Real).
-         * * REGRA DE ARQUITETURA (Strict Real-Time): 
-         * 1. PROIBIDO o uso de alocação dinâmica (new, malloc, std::vector dinâmico).
-         * 2. PROIBIDO o uso de bibliotecas matemáticas pesadas da <cmath>.
-         * 3. PROIBIDO lançar exceções (throw / try-catch).
-         * 4. PROIBIDO locks bloqueantes (mutex) ou I/O (printf, std::cout).
+         * @brief Fase 2: Alocação e Setup.
+         * Único local onde alocação dinâmica é permitida.
+         * Agora o nó deve usar o seu próprio `output_block_sizes` para alocar memória,
+         * e não mais parâmetros globais.
+         */
+        virtual void prepare() = 0;
+
+        /**
+         * @brief Fase 3: Processamento em Tempo Real.
+         * Restrições mantidas: sem new, sem locks, sem exceções.
          */
         virtual void process() = 0;
 
-        // Define um parâmetro interno estático do nó
-        virtual void set_parameter(const std::string& /* param_name */, double /* value */) {
-            // Método vazio por defeito
-        }
+        virtual void set_parameter(const std::string& /* param_name */, double /* value */) {}
+
+        // Abaixo do set_parameter atual
+        virtual void set_parameter_array(const std::string& /* param_name */, const std::vector<double>& /* values */) {}
 };

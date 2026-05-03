@@ -5,11 +5,12 @@ class GraphLoader:
     @staticmethod
     def load_from_json(engine: core.Engine, filepath: str):
         print(f"[GraphLoader] Lendo montagem de grafo em: {filepath}")
+        
         with open(filepath, 'r') as f:
             data = json.load(f)
-
+            
         node_ids = {} # Dicionário (Nome Visual -> ID do C++)
-
+        
         # 1. Instanciar Nós no Engine C++
         for node in data.get('nodes', []):
             name = node['name']
@@ -21,13 +22,20 @@ class GraphLoader:
                 
             node_ids[name] = node_id
             print(f" -> Nó alocado C++: {name} ({node_type}) | ID: {node_id}")
-
+            
+            # [NOVO] Leitura Inteligente de Parâmetros (Escalares vs Arrays)
             if 'parameters' in node:
                 for param_name, value in node['parameters'].items():
-                    engine.set_node_parameter(node_id, param_name, float(value))
-                    print(f"    - Parâmetro configurado: {param_name} = {value}")
+                    if isinstance(value, list):
+                        # Se for uma lista no JSON, envia como Array para o C++
+                        engine.set_node_parameter_array(node_id, param_name, value)
+                        print(f"    - Parâmetro Array configurado: {param_name} = (Tamanho: {len(value)})")
+                    else:
+                        # Se for um número único, envia o double normal
+                        engine.set_node_parameter(node_id, param_name, float(value))
+                        print(f"    - Parâmetro Escalar configurado: {param_name} = {value}")
 
-        # 2. Conectar as Arestas (Zero-Copy routing)
+        # 2. Conectar as Arestas (Zero-Copy routing + Multirate SDF)
         for edge in data.get('edges', []):
             src = edge['source']
             src_port = edge['source_port']

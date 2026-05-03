@@ -1,25 +1,35 @@
 #include "engine.hpp"
 #include "node_factory.hpp"
-#include "../nodes_cpp/dummy_nodes.hpp"
+
+// Headers antigos
 #include "../nodes_cpp/math_nodes.hpp"
 #include "../nodes_cpp/oscillator_nodes.hpp"
+
+// [NOVO] Headers dos Vértices Avançados
+#include "../nodes_cpp/decimator.hpp"
+#include "../nodes_cpp/windowing.hpp"
+#include "../nodes_cpp/butterworth_filter.hpp"
+#include "../nodes_cpp/convolution.hpp"
+#include "../nodes_cpp/quadrature_modulator.hpp"
 
 // ==========================================
 // Função Global de Registro de Nós
 // ==========================================
 
 void register_core_nodes() {
-    // Nós de Teste (Dummies)
-    NodeFactory<double>::get_instance().register_node("DummyGenerator", [](){ return new DummyGenerator<double>(); });
-    NodeFactory<double>::get_instance().register_node("DummyMultiplier", [](){ return new DummyMultiplier<double>(); });
-
-    // Novos Nós Matemáticos (Fase 4.1)
+    // Nós de Teste e Básicos
     NodeFactory<double>::get_instance().register_node("Add", [](){ return new AddNode<double>(); });
     NodeFactory<double>::get_instance().register_node("Multiply", [](){ return new MultiplyNode<double>(); });
     NodeFactory<double>::get_instance().register_node("Gain", [](){ return new GainNode<double>(); });
     NodeFactory<double>::get_instance().register_node("Constant", [](){ return new ConstantNode<double>(); });
-
     NodeFactory<double>::get_instance().register_node("SineOscillator", [](){ return new SineOscillator<double>(); });
+
+    // [NOVO] Nós Avançados (SDF, FIR, IIR, I/Q)
+    NodeFactory<double>::get_instance().register_node("Decimator", [](){ return new Decimator<double>(); });
+    NodeFactory<double>::get_instance().register_node("Windowing", [](){ return new Windowing<double>(); });
+    NodeFactory<double>::get_instance().register_node("ButterworthFilter", [](){ return new ButterworthFilter<double>(); });
+    NodeFactory<double>::get_instance().register_node("Convolution", [](){ return new Convolution<double>(); });
+    NodeFactory<double>::get_instance().register_node("QuadratureModulator", [](){ return new QuadratureModulator<double>(); });
 }
 
 // ==========================================
@@ -99,12 +109,23 @@ void Engine<T>::add_edge(int src_id, int src_port, int dest_id, int dest_port) {
 
 template <typename T>
 std::vector<T> Engine<T>::get_node_output(int node_id, int port) {
-    std::vector<T> result(blockSize, static_cast<T>(0)); // Preenche com zeros por defeito
+    int actual_size = 0;
+    if (graph != nullptr) {
+        // Consulta o tamanho real daquela porta (Multirate)
+        actual_size = graph->get_node_output_size(node_id, port);
+    }
+
+    // Se o nó não existir ou a porta for inválida, retorna vetor vazio
+    if (actual_size <= 0) return std::vector<T>();
+
+    // Aloca o vetor do Python com o tamanho EXATO da saída do nó
+    std::vector<T> result(actual_size, static_cast<T>(0));
+
     if (graph != nullptr) {
         const T* buffer = graph->get_node_output_buffer(node_id, port);
         if (buffer != nullptr) {
-            // Copia a memória Zero-Copy do C++ para um Vector independente e seguro
-            for (int i = 0; i < blockSize; ++i) {
+            // Copia apenas a memória segura
+            for (int i = 0; i < actual_size; ++i) {
                 result[i] = buffer[i];
             }
         }
@@ -117,6 +138,21 @@ void Engine<T>::set_node_parameter(int node_id, const std::string& param_name, d
     if (graph != nullptr) {
         graph->set_node_parameter(node_id, param_name, value);
     }
+}
+
+template <typename T>
+void Engine<T>::set_node_parameter_array(int node_id, const std::string& param_name, const std::vector<double>& values) {
+    if (graph != nullptr) {
+        graph->set_node_parameter_array(node_id, param_name, values);
+    }
+}
+
+template <typename T>
+double Engine<T>::get_node_output_sample_rate(int node_id, int port) {
+    if (graph != nullptr) {
+        return graph->get_node_output_sample_rate(node_id, port);
+    }
+    return 0.0;
 }
 
 // ==========================================

@@ -72,12 +72,27 @@ class DSP2TestHarness:
 
         # Gera os sub-gráficos dinamicamente
         for ax, (node_name, signal), color in zip(axs, data.items(), colors):
-            ax.plot(signal, color=color, label=node_name)
+            # 1. Descobre o ID do nó usando o dicionário da classe
+            node_id = self.node_ids[node_name]
+            
+            # 2. Puxa a taxa de amostragem real negociada no C++ (SDF Multirate)
+            sample_rate = self.engine.get_node_output_sample_rate(node_id, 0)
+            
+            # 3. Aplica a física (t = n / Fs) se a taxa for válida
+            if sample_rate > 0 and len(signal) > 0:
+                time_axis = np.arange(len(signal)) / sample_rate
+                ax.plot(time_axis, signal, color=color, label=f"{node_name} (Fs: {sample_rate}Hz)")
+            else:
+                # Fallback seguro
+                ax.plot(signal, color=color, label=node_name)
+
             ax.legend(loc="upper right")
             ax.grid(True, linestyle='--', alpha=0.6)
-            ax.set_ylabel('Amplitude')
+            ax.set_ylabel('Amplitude f(x)')
 
-        axs[-1].set_xlabel('Amostras de Áudio')
+        # 4. Atualiza o eixo X para refletir o tempo
+        axs[-1].set_xlabel('Tempo x (Segundos)')
+        
         plt.tight_layout()
         plt.savefig(output_path)
         print(f"\n[Tester] Validação visual guardada em: {output_path}")

@@ -136,3 +136,17 @@ public:
 Se você modificar ou adicionar uma função matemática utilitária em `core/fast_math.hpp` ou `core/buffer_ops.hpp`, você **deve**:
 1. Documentar a função inline com `@brief` e `@param`.
 2. Atualizar imediatamente o ficheiro `/docs/api.md` com a nova função, descrevendo o seu impacto na performance (ex: se é otimizada para SIMD, se gasta muita RAM devido a uma *Lookup Table* muito grande, etc.).
+
+## 8. Arquitetura Synchronous Dataflow (SDF) Multirate
+
+O D(SP)^2 evoluiu de um modelo Single-Rate para uma arquitetura SDF Multirate robusta. 
+O tamanho do bloco (`blockSize`) e a taxa de amostragem (`sampleRate`) não são mais impostos globalmente pelo motor, mas sim negociados topologicamente entre os vértices.
+
+### 8.1. O Novo Ciclo de Vida do Nó (`NodeBase<T>`)
+A assinatura de inicialização em `core/node_base.hpp` foi dividida em duas etapas para respeitar as regras de performance de tempo real descritas no `AGENTS.md`:
+ 
+1.  `compute_dimensions()`: Executado após o motor injetar as dimensões dos nós de origem. O nó lê `input_block_sizes` e calcula `output_block_sizes` e `output_sample_rates`. (Exemplo: Um `Decimator` divide os valores de entrada pelo fator M).
+2.  `prepare()`: Único local onde alocação dinâmica é permitida. O nó aloca seus arrays utilizando os tamanhos exatos calculados na fase anterior, poupando memória física.
+ 
+### 8.2. Compilação Segura do Grafo (`Graph<T>::compile`)
+Para evitar vazamentos de memória e *Buffer Overruns*, a função `compile()` agora inicializa todas as portas (conectadas ou não) com os valores base do motor. Em seguida, as dimensões são propagadas camada por camada seguindo a ordem topológica (Algoritmo de Kahn), garantindo que cada nó conheça o estado exato da sua vizinhança antes de instanciar o *Heap*.

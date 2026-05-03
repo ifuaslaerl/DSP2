@@ -70,3 +70,17 @@ Sempre que você criar um novo arquivo de nó em `nodes_cpp/` (ex: `meu_filtro.h
       return new FiltroBiquad<double>(); 
   });
   ```
+
+## 6. Parâmetros em Array e Multirate (Novas APIs Fase 4.1)
+
+Para suportar filtros avançados como Convolução (FIR) estrita no domínio do tempo, o D(SP)^2 agora suporta injeção de *Arrays* a partir do JSON diretamente para os nós C++.
+
+### `NodeBase<T>::set_parameter_array` e `Engine<T>::set_node_parameter_array`
+- **Assinatura:** `void set_parameter_array(const std::string& param_name, const std::vector<double>& values)`
+- **Descrição:** Permite o envio de vetores inteiros (ex: Resposta ao Impulso de um Filtro) para inicialização no `prepare()`.
+- **Uso Híbrido:** O `GraphLoader` (`dsp2/graph_loader.py`) inspeciona o JSON; se um parâmetro for uma lista Python, ele invoca esta nova API em vez do escalar `set_parameter`.
+
+### Extração de Dimensões Físicas (Pybind11)
+Para suportar a visualização física (Tempo em Segundos) em grafos Multirate, o módulo Python `dsp2._dsp2_core` expõe:
+- `get_node_output_size(node_id, port) -> int`: Retorna o tamanho físico do bloco alocado por um nó específico. O método `get_node_output` agora utiliza esse valor dinamicamente para evitar leitura de memória lixo (*Buffer Overread*).
+- `get_node_output_sample_rate(node_id, port) -> double`: Retorna a taxa de amostragem física (Fs) negociada para aquela porta.

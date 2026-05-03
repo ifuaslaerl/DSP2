@@ -169,22 +169,55 @@ void Graph<T>::bind_pointers() {
 // ==========================================
 // Compilação (Onde alocação de memória é permitida)
 // ==========================================
-
 template <typename T>
-void Graph<T>::compile(double sampleRate, int blockSize) {
+void Graph<T>::compile(double baseSampleRate, int baseBlockSize) {
     run_kosaraju();
-
     if (detect_cycles()) {
         resolve_cyclic_graph();
     }
-
     build_dag_layers();
-    
-    // Todos os nós alocam as suas memórias locais de forma segura
+
+    // 1. Inicializa TODAS as portas (entradas e saídas) com as propriedades globais.
+    // Isso garante que portas não conectadas (como as do SineOscillator em testes simples)
+    // tenham um tamanho seguro de fallback (Evita alocação de tamanho 0 e Buffer Overrun).
     for (auto* node : nodes) {
-        node->prepare(sampleRate, blockSize);
+        for (size_t i = 0; i < node->output_block_sizes.size(); ++i) {
+            node->output_block_sizes[i] = baseBlockSize;
+            node->output_sample_rates[i] = baseSampleRate;
+        }
+        for (size_t i = 0; i < node->input_block_sizes.size(); ++i) {
+            node->input_block_sizes[i] = baseBlockSize;
+            node->input_sample_rates[i] = baseSampleRate;
+        }
     }
 
+    // 2. Propagação Topológica (Negociação SDF)
+    for (const auto& layer : execution_layers) {
+        for (int node_id : layer) {
+            NodeBase<T>* current_node = nodes[node_id];
+
+            // Busca as dimensões enviadas pelos nós de origem ligados a este
+            // Se houver um cabo, o valor padrão é sobrescrito pelo valor real roteado.
+            for (const auto& edge : edges) {
+                if (edge.dest_id == node_id) {
+                    NodeBase<T>* source_node = nodes[edge.source_id];
+                    
+                    current_node->input_block_sizes[edge.dest_port] = source_node->output_block_sizes[edge.source_port];
+                    current_node->input_sample_rates[edge.dest_port] = source_node->output_sample_rates[edge.source_port];
+                }
+            }
+
+            // O nó recalcula suas próprias saídas baseado nas entradas (úteis para Decimadores)
+            current_node->compute_dimensions();
+        }
+    }
+
+    // 3. Fase de Setup: Todos os nós alocam as suas memórias locais com os tamanhos corretos
+    for (auto* node : nodes) {
+        node->prepare();
+    }
+    
+    // 4. Soldagem Zero-Copy (Ponteiros de memória)
     bind_pointers();
 }
 

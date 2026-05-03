@@ -52,5 +52,7 @@ PYBIND11_MODULE(_dsp2_core, m) {
         .def("add_node", &Engine<double>::add_node, "Adiciona um nó pelo nome da classe e retorna seu ID interno")
         .def("add_edge", &Engine<double>::add_edge, "Conecta a porta de saída de um nó à porta de entrada de outro")
         .def("set_node_parameter", &Engine<double>::set_node_parameter, "Define um parametro base do no")
-        .def("get_node_output", &Engine<double>::get_node_output, "Retorna uma copia do buffer de saida de um no");
+        .def("get_node_output", &Engine<double>::get_node_output, "Retorna uma copia do buffer de saida de um no")
+        .def("set_node_parameter_array", &Engine<double>::set_node_parameter_array, "Define um array de parametros para o no")
+        .def("get_node_output_sample_rate", &Engine<double>::get_node_output_sample_rate, "Retorna a taxa de amostragem física (Hz) de uma porta de saída");
 }
