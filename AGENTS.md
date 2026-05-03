@@ -41,6 +41,7 @@ A consistência da arquitetura é fundamental para que o motor em C++ funcione s
 O projeto é conteinerizado para garantir a reprodutibilidade da compilação do C++ e das dependências do Python.
 
 * **Execução:** Não compile o código diretamente na máquina host. Sempre utilize o ambiente Docker configurado no `docker-compose.yaml`.
+* **Gate Obrigatório Antes de Commit:** Antes de criar qualquer commit, rode o script de verificação exatamente como documentado no `README.md`: `docker compose exec -T dsp2-env bash -lc "scripts/check.sh"`. Só faça commit se o script passar completamente. Se o script falhar por motivo ambiental ou de infraestrutura, registre isso explicitamente na resposta e não oculte a falha.
 * **Hardware:** O acesso ao hardware é mapeado pelo Docker via diretiva `devices`. Se um novo hardware for adicionado, instrua o usuário a atualizar o `docker-compose.yaml`.
 
 ## 6. Sistema de Logging e Debug (Tempo Real)

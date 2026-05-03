@@ -164,7 +164,9 @@ Em alguns ambientes Windows/WSL, caso o bit executável não seja preservado no 
 bash scripts/check.sh
 ```
 
-O script configura, compila e testa os alvos `EMBEDDED` e `SIMULATION`, incluindo os bindings Python no alvo de simulação. Para debug manual, os comandos equivalentes são:
+O script configura, compila e testa os alvos `EMBEDDED` e `SIMULATION`, incluindo os bindings Python no alvo de simulação. Depois do build `SIMULATION`, ele também executa os testes Python end-to-end com `unittest` usando JSON e a ponte Python/C++ real. Não usamos `pytest` nem dependências extras para estes testes.
+
+Para debug manual, os comandos equivalentes são:
 
 ```bash
 cd /app
@@ -175,6 +177,8 @@ ctest --test-dir /app/build-embedded --output-on-failure
 cmake -S /app -B /app/build-sim -DDSP2_TARGET=SIMULATION
 cmake --build /app/build-sim
 ctest --test-dir /app/build-sim --output-on-failure
+
+python3 -m unittest discover -s tests -p "test_*.py"
 ```
 
 ### Primeira validação recomendada

@@ -193,6 +193,64 @@ bool test_multiple_inputs() {
     return expect_block_value(engine.get_node_output(add, 0), 16, 6.0);
 }
 
+bool test_fan_out_routing() {
+    Engine<double> engine;
+    engine.set_signal_parameters(44100.0, 16);
+
+    const int source = engine.add_node("Constant");
+    const int gain_a = engine.add_node("Gain");
+    const int gain_b = engine.add_node("Gain");
+
+    if (!expect_true(source >= 0 && gain_a >= 0 && gain_b >= 0,
+                     "Fan-out test nodes must be created.")) {
+        return false;
+    }
+
+    engine.set_node_parameter(source, "value", 2.0);
+    engine.set_node_parameter(gain_a, "gain", 3.0);
+    engine.set_node_parameter(gain_b, "gain", 5.0);
+    engine.add_edge(source, 0, gain_a, 0);
+    engine.add_edge(source, 0, gain_b, 0);
+
+    engine.prepare_engine();
+    engine.process_block();
+
+    if (!expect_block_value(engine.get_node_output(gain_a, 0), 16, 6.0)) {
+        return false;
+    }
+    return expect_block_value(engine.get_node_output(gain_b, 0), 16, 10.0);
+}
+
+bool test_multi_layer_routing() {
+    Engine<double> engine;
+    engine.set_signal_parameters(44100.0, 16);
+
+    const int source = engine.add_node("Constant");
+    const int gain_a = engine.add_node("Gain");
+    const int gain_b = engine.add_node("Gain");
+    const int offset = engine.add_node("Constant");
+    const int add = engine.add_node("Add");
+
+    if (!expect_true(source >= 0 && gain_a >= 0 && gain_b >= 0 && offset >= 0 && add >= 0,
+                     "Multi-layer test nodes must be created.")) {
+        return false;
+    }
+
+    engine.set_node_parameter(source, "value", 2.0);
+    engine.set_node_parameter(gain_a, "gain", 3.0);
+    engine.set_node_parameter(gain_b, "gain", 4.0);
+    engine.set_node_parameter(offset, "value", 1.0);
+    engine.add_edge(source, 0, gain_a, 0);
+    engine.add_edge(gain_a, 0, gain_b, 0);
+    engine.add_edge(gain_b, 0, add, 0);
+    engine.add_edge(offset, 0, add, 1);
+
+    engine.prepare_engine();
+    engine.process_block();
+
+    return expect_block_value(engine.get_node_output(add, 0), 16, 25.0);
+}
+
 bool test_invalid_ids_and_ports() {
     Engine<double> engine;
     engine.set_signal_parameters(44100.0, 16);
@@ -268,6 +326,8 @@ int main() {
     if (!test_zero_copy_routing()) return 1;
     if (!test_topological_order()) return 1;
     if (!test_multiple_inputs()) return 1;
+    if (!test_fan_out_routing()) return 1;
+    if (!test_multi_layer_routing()) return 1;
     if (!test_invalid_ids_and_ports()) return 1;
     if (!test_dimension_propagation()) return 1;
 

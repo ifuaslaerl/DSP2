@@ -18,7 +18,14 @@ run_target() {
     ctest --test-dir "$build_dir" --output-on-failure
 }
 
+run_python_tests() {
+    echo "==> Testing Python E2E"
+    cd "$ROOT_DIR"
+    python3 -m unittest discover -s tests -p "test_*.py"
+}
+
 run_target "EMBEDDED" "$ROOT_DIR/build-embedded"
 run_target "SIMULATION" "$ROOT_DIR/build-sim"
+run_python_tests
 
 echo "==> All checks passed"

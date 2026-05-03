@@ -16,6 +16,7 @@ namespace {
 
 constexpr double kTolerance = 1e-9;
 constexpr double kLooseTolerance = 1e-6;
+constexpr double kPi = 3.14159265358979323846;
 
 bool nearly_equal(double a, double b, double tolerance = kTolerance) {
     return std::abs(a - b) <= tolerance;
@@ -183,6 +184,46 @@ bool test_sine_oscillator_node() {
     return expect_block_value(engine.get_node_output(oscillator, 0), 8, 0.0, kLooseTolerance);
 }
 
+bool test_sine_oscillator_continuity() {
+    Engine<double> engine;
+    engine.set_signal_parameters(44100.0, 8);
+    const int oscillator = engine.add_node("SineOscillator");
+    if (!expect_true(oscillator >= 0, "SineOscillator continuity node must be created.")) {
+        return false;
+    }
+
+    engine.set_node_parameter(oscillator, "frequency", 440.0);
+    engine.prepare_engine();
+    engine.process_block();
+    const std::vector<double> first = engine.get_node_output(oscillator, 0);
+    engine.process_block();
+    const std::vector<double> second = engine.get_node_output(oscillator, 0);
+
+    if (!expect_true(static_cast<int>(first.size()) == 8 && static_cast<int>(second.size()) == 8,
+                     "SineOscillator continuity outputs must preserve block size.")) {
+        return false;
+    }
+
+    for (int i = 0; i < 8; ++i) {
+        if (!std::isfinite(first[i]) || !std::isfinite(second[i])) {
+            std::cout << "FAIL: SineOscillator sample " << i << " is not finite.\n";
+            return false;
+        }
+        if (std::abs(first[i]) > 1.0 + kLooseTolerance ||
+            std::abs(second[i]) > 1.0 + kLooseTolerance) {
+            std::cout << "FAIL: SineOscillator sample " << i << " is outside [-1, 1].\n";
+            return false;
+        }
+    }
+
+    if (!expect_true(!nearly_equal(second[0], 0.0, 1e-3),
+                     "SineOscillator phase must continue across blocks.")) {
+        return false;
+    }
+
+    return true;
+}
+
 bool test_decimator_node() {
     Graph<double> graph;
     auto* source = new SequenceSource();
@@ -212,6 +253,44 @@ bool test_decimator_node() {
         if (!nearly_equal(output[i], expected)) {
             std::cout << "FAIL: Decimator sample " << i << " expected " << expected
                       << ", got " << output[i] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_decimator_factor_four() {
+    Graph<double> graph;
+    auto* source = new SequenceSource();
+    auto* decimator = new Decimator<double>();
+
+    graph.add_node(source);
+    graph.add_node(decimator);
+    graph.set_node_parameter(1, "factor", 4.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(48000.0, 16);
+    graph.process();
+
+    if (!expect_true(graph.get_node_output_size(1, 0) == 4,
+                     "Decimator factor 4 must divide block size by 4.")) {
+        return false;
+    }
+    if (!expect_true(nearly_equal(graph.get_node_output_sample_rate(1, 0), 12000.0),
+                     "Decimator factor 4 must divide sample rate by 4.")) {
+        return false;
+    }
+
+    const double* output = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(output != nullptr, "Decimator factor 4 output must be readable.")) {
+        return false;
+    }
+
+    for (int i = 0; i < 4; ++i) {
+        const double expected = static_cast<double>(i * 4);
+        if (!nearly_equal(output[i], expected)) {
+            std::cout << "FAIL: Decimator factor 4 sample " << i << " expected "
+                      << expected << ", got " << output[i] << ".\n";
             return false;
         }
     }
@@ -250,6 +329,60 @@ bool test_windowing_node() {
     return true;
 }
 
+bool test_windowing_hann_values() {
+    Graph<double> graph;
+    auto* source = new ConstantSource(1.0);
+    auto* windowing = new Windowing<double>();
+
+    graph.add_node(source);
+    graph.add_node(windowing);
+    graph.set_node_parameter(1, "type", 0.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(44100.0, 8);
+    graph.process();
+
+    const double* output = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(output != nullptr, "Hann output must be readable.")) return false;
+
+    for (int i = 0; i < 8; ++i) {
+        const double expected = 0.5 * (1.0 - std::cos(2.0 * kPi * i / 7.0));
+        if (!nearly_equal(output[i], expected, kLooseTolerance)) {
+            std::cout << "FAIL: Hann sample " << i << " expected " << expected
+                      << ", got " << output[i] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_windowing_hamming_values() {
+    Graph<double> graph;
+    auto* source = new ConstantSource(1.0);
+    auto* windowing = new Windowing<double>();
+
+    graph.add_node(source);
+    graph.add_node(windowing);
+    graph.set_node_parameter(1, "type", 1.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(44100.0, 8);
+    graph.process();
+
+    const double* output = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(output != nullptr, "Hamming output must be readable.")) return false;
+
+    for (int i = 0; i < 8; ++i) {
+        const double expected = 0.54 - 0.46 * std::cos(2.0 * kPi * i / 7.0);
+        if (!nearly_equal(output[i], expected, kLooseTolerance)) {
+            std::cout << "FAIL: Hamming sample " << i << " expected " << expected
+                      << ", got " << output[i] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool test_convolution_node() {
     Graph<double> graph;
     auto* source = new SequenceSource();
@@ -270,6 +403,35 @@ bool test_convolution_node() {
         if (!nearly_equal(output[i], expected)) {
             std::cout << "FAIL: Convolution sample " << i << " expected " << expected
                       << ", got " << output[i] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_convolution_moving_average_kernel() {
+    Graph<double> graph;
+    auto* source = new SequenceSource();
+    auto* convolution = new Convolution<double>();
+
+    graph.add_node(source);
+    graph.add_node(convolution);
+    graph.set_node_parameter_array(1, "kernel", std::vector<double>{0.5, 0.5});
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(44100.0, 8);
+    graph.process();
+
+    const double* output = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(output != nullptr, "Moving average convolution output must be readable.")) {
+        return false;
+    }
+
+    const double expected[8] = {0.0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5};
+    for (int i = 0; i < 8; ++i) {
+        if (!nearly_equal(output[i], expected[i])) {
+            std::cout << "FAIL: Moving average convolution sample " << i << " expected "
+                      << expected[i] << ", got " << output[i] << ".\n";
             return false;
         }
     }
@@ -303,6 +465,79 @@ bool test_butterworth_filter_node() {
             std::cout << "FAIL: ButterworthFilter sample " << i << " is not finite.\n";
             return false;
         }
+    }
+
+    return true;
+}
+
+bool test_butterworth_lowpass_dc_response() {
+    Graph<double> graph;
+    auto* source = new ConstantSource(1.0);
+    auto* filter = new ButterworthFilter<double>();
+
+    graph.add_node(source);
+    graph.add_node(filter);
+    graph.set_node_parameter(1, "cutoff", 1000.0);
+    graph.set_node_parameter(1, "type", 0.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(44100.0, 64);
+    graph.process();
+
+    const double* output = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(output != nullptr, "Butterworth low-pass output must be readable.")) {
+        return false;
+    }
+
+    for (int i = 0; i < 64; ++i) {
+        if (!std::isfinite(output[i])) {
+            std::cout << "FAIL: Butterworth low-pass sample " << i << " is not finite.\n";
+            return false;
+        }
+    }
+
+    if (!expect_true(output[63] > output[0],
+                     "Butterworth low-pass DC response must rise after startup.")) {
+        return false;
+    }
+    if (!expect_true(output[63] > 0.5 && output[63] < 1.5,
+                     "Butterworth low-pass DC response must approach the input level.")) {
+        return false;
+    }
+
+    return true;
+}
+
+bool test_butterworth_highpass_dc_decay() {
+    Graph<double> graph;
+    auto* source = new ConstantSource(1.0);
+    auto* filter = new ButterworthFilter<double>();
+
+    graph.add_node(source);
+    graph.add_node(filter);
+    graph.set_node_parameter(1, "cutoff", 1000.0);
+    graph.set_node_parameter(1, "type", 1.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(44100.0, 64);
+
+    for (int block = 0; block < 12; ++block) {
+        graph.process();
+    }
+
+    const double* output = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(output != nullptr, "Butterworth high-pass output must be readable.")) {
+        return false;
+    }
+
+    for (int i = 0; i < 64; ++i) {
+        if (!std::isfinite(output[i])) {
+            std::cout << "FAIL: Butterworth high-pass sample " << i << " is not finite.\n";
+            return false;
+        }
+    }
+
+    if (!expect_true(std::abs(output[63]) < 0.05,
+                     "Butterworth high-pass DC response must decay toward zero.")) {
+        return false;
     }
 
     return true;
@@ -352,6 +587,51 @@ bool test_quadrature_modulator_node() {
     return true;
 }
 
+bool test_quadrature_modulator_nonzero_frequency() {
+    Graph<double> graph;
+    auto* source = new ConstantSource(2.0);
+    auto* modulator = new QuadratureModulator<double>();
+
+    graph.add_node(source);
+    graph.add_node(modulator);
+    graph.set_node_parameter(1, "frequency", 1000.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(48000.0, 16);
+    graph.process();
+
+    if (!expect_true(graph.get_node_output_size(1, 0) == 16 &&
+                     graph.get_node_output_size(1, 1) == 16,
+                     "QuadratureModulator nonzero outputs must preserve block size.")) {
+        return false;
+    }
+    if (!expect_true(nearly_equal(graph.get_node_output_sample_rate(1, 0), 48000.0) &&
+                     nearly_equal(graph.get_node_output_sample_rate(1, 1), 48000.0),
+                     "QuadratureModulator nonzero outputs must preserve sample rate.")) {
+        return false;
+    }
+
+    const double* out_i = graph.get_node_output_buffer(1, 0);
+    const double* out_q = graph.get_node_output_buffer(1, 1);
+    if (!expect_true(out_i != nullptr && out_q != nullptr,
+                     "QuadratureModulator nonzero outputs must be readable.")) {
+        return false;
+    }
+
+    for (int i = 0; i < 16; ++i) {
+        if (!std::isfinite(out_i[i]) || !std::isfinite(out_q[i])) {
+            std::cout << "FAIL: Quadrature nonzero sample " << i << " is not finite.\n";
+            return false;
+        }
+        if (std::abs(out_i[i]) > 2.0 + kLooseTolerance ||
+            std::abs(out_q[i]) > 2.0 + kLooseTolerance) {
+            std::cout << "FAIL: Quadrature nonzero sample " << i << " exceeds input amplitude.\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
 }  // namespace
 
 int main() {
@@ -362,11 +642,19 @@ int main() {
     if (!test_add_node()) return 1;
     if (!test_multiply_node()) return 1;
     if (!test_sine_oscillator_node()) return 1;
+    if (!test_sine_oscillator_continuity()) return 1;
     if (!test_decimator_node()) return 1;
+    if (!test_decimator_factor_four()) return 1;
     if (!test_windowing_node()) return 1;
+    if (!test_windowing_hann_values()) return 1;
+    if (!test_windowing_hamming_values()) return 1;
     if (!test_convolution_node()) return 1;
+    if (!test_convolution_moving_average_kernel()) return 1;
     if (!test_butterworth_filter_node()) return 1;
+    if (!test_butterworth_lowpass_dc_response()) return 1;
+    if (!test_butterworth_highpass_dc_decay()) return 1;
     if (!test_quadrature_modulator_node()) return 1;
+    if (!test_quadrature_modulator_nonzero_frequency()) return 1;
 
     std::cout << "SUCCESS: nodes_cpp scenarios passed.\n";
     return 0;
