@@ -8,25 +8,13 @@ O **$D(SP)^2$** é um motor híbrido de processamento digital de sinais (DSP) ba
 * **Dual-Target Build:** Compile para `SIMULATION` (com bindings Pybind11 para orquestração em Python) ou `EMBEDDED` (biblioteca estática para microcontroladores).
 * **Multirate SDF:** Suporte nativo a decimadores e convolução com negociação automática de tamanho de bloco e taxa de amostragem.
 
-## Como Funciona?
-Você define a topologia do seu processamento em um arquivo JSON simples e o motor orquestra a execução de alta performance em C++:
+# Substitua a seção "## Como Funciona?" inteira (incluindo o bloco de código JSON) no arquivo README.md pelo seguinte trecho:
 
-```json
-{
-    "nodes": [
-        { "name": "Osc_A", "type": "SineOscillator", "parameters": { "frequency": 440.0 } },
-        { "name": "Osc_B", "type": "SineOscillator", "parameters": { "frequency": 220.0 } },
-        { "name": "Mixer", "type": "Add" },
-        { "name": "RingMod", "type": "Multiply" }
-    ],
-    "edges": [
-        { "source": "Osc_A", "source_port": 0, "dest": "Mixer", "dest_port": 0 },
-        { "source": "Osc_B", "source_port": 0, "dest": "Mixer", "dest_port": 1 },
-        { "source": "Osc_A", "source_port": 0, "dest": "RingMod", "dest_port": 0 },
-        { "source": "Osc_B", "source_port": 0, "dest": "RingMod", "dest_port": 1 }
-    ]
-}
-```
+## Como Funciona?
+
+O D(SP)^2 permite definir a topologia do seu processamento em um arquivo JSON simples. O motor lê esta estrutura e orquestra a execução de alta performance em C++ utilizando roteamento **Zero-Copy**.
+
+Para aprender a sintaxe correta, estruturar os seus `nodes` e `edges`, e ver exemplos de como carregar a topologia no Python, **consulte o nosso guia completo em [docs/GRAPH_ROUTING.md](docs/GRAPH_ROUTING.md)**.
 
 ## Configuração do Ambiente (Docker)
 
@@ -190,6 +178,22 @@ cd build-embedded
 cmake -DDSP2_TARGET=EMBEDDED ..
 make
 make test
+```
+
+### Como Executar a Simulação (Python)
+
+Após a compilação bem-sucedida para o alvo `SIMULATION`, você pode validar o motor executando os scripts de orquestração dentro do contêiner:
+
+#### 1. Orquestrador Híbrido
+Executa o ciclo de processamento padrão definido no código (carregando o grafo de teste):
+```bash
+python3 -m dsp2.build_graph
+```
+
+#### 2. Inspetor de Sinais (Visualização)
+Processa um arquivo JSON arbitrário e gera um gráfico de análise em `dev_panel/`:
+```bash
+python3 dev_panel/signal_tester.py --graph tests/math_test.json --blocks 20 --output dev_panel/results.png
 ```
 
 ### Nota sobre Linux com SELinux

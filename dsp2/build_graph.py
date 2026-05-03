@@ -74,7 +74,7 @@ class DSP2Orchestrator:
 
     def run_simulation(self, duration_seconds=DEFAULT_SIMULATION_DURATION):
         # 1. NOVO: Carrega o Grafo dinamicamente antes do prepare()!
-        GraphLoader.load_from_json(self.engine, 'tests/graph_test.json')
+        GraphLoader.load_from_json(self.engine, 'tests/math_test.json')
         
         print("[Python] Preparando Engine (Aloca o de Mem ria C++)...")
         self.engine.prepare_engine()
