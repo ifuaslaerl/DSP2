@@ -1,0 +1,25 @@
+{
+    "nodes": [
+        {
+            "name": "Osc_Principal",
+            "type": "SineOscillator",
+            "parameters": { "frequency": 1000.0 }
+        },
+        {
+            "name": "Filtro_Media_Movel",
+            "type": "Convolution",
+            "parameters": {
+                "kernel": [0.1, 0.15, 0.5, 0.15, 0.1]
+            }
+        },
+        {
+            "name": "Redutor_Multirate",
+            "type": "Decimator",
+            "parameters": { "factor": 2.0 }
+        }
+    ],
+    "edges": [
+        { "source": "Osc_Principal", "source_port": 0, "dest": "Filtro_Media_Movel", "dest_port": 0 },
+        { "source": "Filtro_Media_Movel", "source_port": 0, "dest": "Redutor_Multirate", "dest_port": 0 }
+    ]
+}

@@ -234,6 +234,19 @@ python3 dev_panel/signal_tester.py \
   --blocks 8
 ```
 
+#### 3. Comparador de Simulações
+Compara duas versões de um grafo e gera um relatório Markdown com as diferenças de
+métricas por nó/porta. Isto é útil para validar o impacto de alterações em filtros,
+decimadores e novos nós C++:
+
+```bash
+python3 dev_panel/compare_simulations.py \
+  --baseline tests/advanced_test.json \
+  --candidate tests/advanced_test_modified.json \
+  --output dev_panel/comparison_report.md \
+  --blocks 8
+```
+
 ### Nota sobre Linux com SELinux
 
 O `docker-compose.yaml` usa o bind mount portável `.:/app` para funcionar tanto em Linux como em WSL 2. Se algum host Linux com SELinux precisar de rotulagem explícita de volume, esse ajuste deve ser feito localmente nesse host, sem alterar o workflow principal do projeto.
