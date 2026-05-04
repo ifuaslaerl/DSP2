@@ -152,6 +152,14 @@ double Engine<T>::get_node_output_sample_rate(int node_id, int port) {
     return 0.0;
 }
 
+template <typename T>
+int Engine<T>::get_node_output_port_count(int node_id) {
+    if (graph != nullptr) {
+        return graph->get_node_output_port_count(node_id);
+    }
+    return 0;
+}
+
 // ==========================================
 // Instanciação Explícita de Templates (Garante o linking)
 // ==========================================

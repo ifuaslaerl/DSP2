@@ -69,4 +69,6 @@ public:
     void set_node_parameter_array(int node_id, const std::string& param_name, const std::vector<double>& values);
 
     double get_node_output_sample_rate(int node_id, int port);
+
+    int get_node_output_port_count(int node_id);
 };

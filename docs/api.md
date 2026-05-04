@@ -84,3 +84,5 @@ Para suportar filtros avançados como Convolução (FIR) estrita no domínio do 
 Para suportar a visualização física (Tempo em Segundos) em grafos Multirate, o módulo Python `dsp2._dsp2_core` expõe:
 - `get_node_output_size(node_id, port) -> int`: Retorna o tamanho físico do bloco alocado por um nó específico. O método `get_node_output` agora utiliza esse valor dinamicamente para evitar leitura de memória lixo (*Buffer Overread*).
 - `get_node_output_sample_rate(node_id, port) -> double`: Retorna a taxa de amostragem física (Fs) negociada para aquela porta.
+- `get_node_output_port_count(node_id) -> int`: Retorna a quantidade de portas de saída declaradas por um nó. Uso recomendado para ferramentas de inspeção em Python que precisam capturar todas as saídas sem assumir que todo nó possui apenas a porta `0`.
+  - **Notas de Performance:** API de introspecção para fase de simulação/diagnóstico. A consulta é $O(1)$ e não participa do ciclo crítico de processamento.

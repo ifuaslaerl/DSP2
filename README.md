@@ -222,6 +222,18 @@ Processa um arquivo JSON arbitrário e gera um gráfico de análise em `dev_pane
 python3 dev_panel/signal_tester.py --graph tests/math_test.json --blocks 20 --output dev_panel/results.png
 ```
 
+O inspetor também pode gerar um relatório Markdown automático com a topologia do grafo,
+taxas de amostragem reais por saída, métricas por nó/porta (`min`, `max`, `RMS`,
+`peak`, `DC offset`), logs C++ coletados via Ring Buffer e referência à imagem gerada:
+
+```bash
+python3 dev_panel/signal_tester.py \
+  -g tests/advanced_test.json \
+  -o dev_panel/demo_signal.png \
+  --report dev_panel/demo_report.md \
+  --blocks 8
+```
+
 ### Nota sobre Linux com SELinux
 
 O `docker-compose.yaml` usa o bind mount portável `.:/app` para funcionar tanto em Linux como em WSL 2. Se algum host Linux com SELinux precisar de rotulagem explícita de volume, esse ajuste deve ser feito localmente nesse host, sem alterar o workflow principal do projeto.

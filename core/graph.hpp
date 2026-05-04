@@ -144,4 +144,11 @@ class Graph {
             }
             return 0.0;
         }
+
+        int get_node_output_port_count(int node_id) const {
+            if (node_id >= 0 && static_cast<size_t>(node_id) < nodes.size()) {
+                return static_cast<int>(nodes[node_id]->output_buffers.size());
+            }
+            return 0;
+        }
 };

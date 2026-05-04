@@ -54,5 +54,6 @@ PYBIND11_MODULE(_dsp2_core, m) {
         .def("set_node_parameter", &Engine<double>::set_node_parameter, "Define um parametro base do no")
         .def("get_node_output", &Engine<double>::get_node_output, "Retorna uma copia do buffer de saida de um no")
         .def("set_node_parameter_array", &Engine<double>::set_node_parameter_array, "Define um array de parametros para o no")
-        .def("get_node_output_sample_rate", &Engine<double>::get_node_output_sample_rate, "Retorna a taxa de amostragem física (Hz) de uma porta de saída");
+        .def("get_node_output_sample_rate", &Engine<double>::get_node_output_sample_rate, "Retorna a taxa de amostragem física (Hz) de uma porta de saída")
+        .def("get_node_output_port_count", &Engine<double>::get_node_output_port_count, "Retorna a quantidade de portas de saída de um no");
 }
