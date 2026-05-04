@@ -9,6 +9,7 @@
 #include "../nodes_cpp/convolution.hpp"
 #include "../nodes_cpp/decimator.hpp"
 #include "../nodes_cpp/math_nodes.hpp"
+#include "../nodes_cpp/noise_generator.hpp"
 #include "../nodes_cpp/quadrature_modulator.hpp"
 #include "../nodes_cpp/windowing.hpp"
 
@@ -222,6 +223,117 @@ bool test_sine_oscillator_continuity() {
     }
 
     return true;
+}
+
+bool test_noise_generator_node() {
+    Engine<double> engine;
+    engine.set_signal_parameters(44100.0, 16);
+    const int noise = engine.add_node("NoiseGenerator");
+    if (!expect_true(noise >= 0, "NoiseGenerator node must be created.")) return false;
+
+    engine.set_node_parameter(noise, "amplitude", 0.5);
+    engine.set_node_parameter(noise, "seed", 12345.0);
+    engine.prepare_engine();
+    engine.process_block();
+
+    const std::vector<double> output = engine.get_node_output(noise, 0);
+    if (!expect_true(static_cast<int>(output.size()) == 16,
+                     "NoiseGenerator output must preserve block size.")) {
+        return false;
+    }
+
+    bool differs_from_first = false;
+    for (int i = 0; i < 16; ++i) {
+        if (output[i] < -0.5 || output[i] > 0.5) {
+            std::cout << "FAIL: NoiseGenerator sample " << i
+                      << " is outside configured amplitude.\n";
+            return false;
+        }
+        if (!nearly_equal(output[i], output[0])) {
+            differs_from_first = true;
+        }
+    }
+
+    return expect_true(differs_from_first, "NoiseGenerator output block must not be constant.");
+}
+
+bool test_noise_generator_same_seed_determinism() {
+    Engine<double> first_engine;
+    Engine<double> second_engine;
+    first_engine.set_signal_parameters(44100.0, 16);
+    second_engine.set_signal_parameters(44100.0, 16);
+
+    const int first = first_engine.add_node("NoiseGenerator");
+    const int second = second_engine.add_node("NoiseGenerator");
+    if (!expect_true(first >= 0 && second >= 0,
+                     "NoiseGenerator deterministic nodes must be created.")) {
+        return false;
+    }
+
+    first_engine.set_node_parameter(first, "amplitude", 0.5);
+    second_engine.set_node_parameter(second, "amplitude", 0.5);
+    first_engine.set_node_parameter(first, "seed", 999.0);
+    second_engine.set_node_parameter(second, "seed", 999.0);
+
+    first_engine.prepare_engine();
+    second_engine.prepare_engine();
+    first_engine.process_block();
+    second_engine.process_block();
+
+    const std::vector<double> first_output = first_engine.get_node_output(first, 0);
+    const std::vector<double> second_output = second_engine.get_node_output(second, 0);
+    if (!expect_true(first_output.size() == second_output.size() &&
+                     static_cast<int>(first_output.size()) == 16,
+                     "NoiseGenerator deterministic outputs must have matching size.")) {
+        return false;
+    }
+
+    for (int i = 0; i < 16; ++i) {
+        if (!nearly_equal(first_output[i], second_output[i])) {
+            std::cout << "FAIL: NoiseGenerator same seed sample " << i
+                      << " differs between engines.\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_noise_generator_different_seeds_diverge() {
+    Engine<double> first_engine;
+    Engine<double> second_engine;
+    first_engine.set_signal_parameters(44100.0, 16);
+    second_engine.set_signal_parameters(44100.0, 16);
+
+    const int first = first_engine.add_node("NoiseGenerator");
+    const int second = second_engine.add_node("NoiseGenerator");
+    if (!expect_true(first >= 0 && second >= 0,
+                     "NoiseGenerator different seed nodes must be created.")) {
+        return false;
+    }
+
+    first_engine.set_node_parameter(first, "seed", 1001.0);
+    second_engine.set_node_parameter(second, "seed", 2002.0);
+    first_engine.prepare_engine();
+    second_engine.prepare_engine();
+    first_engine.process_block();
+    second_engine.process_block();
+
+    const std::vector<double> first_output = first_engine.get_node_output(first, 0);
+    const std::vector<double> second_output = second_engine.get_node_output(second, 0);
+    if (!expect_true(first_output.size() == second_output.size() &&
+                     static_cast<int>(first_output.size()) == 16,
+                     "NoiseGenerator different seed outputs must have matching size.")) {
+        return false;
+    }
+
+    for (int i = 0; i < 16; ++i) {
+        if (!nearly_equal(first_output[i], second_output[i])) {
+            return true;
+        }
+    }
+
+    return expect_true(false, "NoiseGenerator different seeds must produce different output.");
 }
 
 bool test_decimator_node() {
@@ -643,6 +755,9 @@ int main() {
     if (!test_multiply_node()) return 1;
     if (!test_sine_oscillator_node()) return 1;
     if (!test_sine_oscillator_continuity()) return 1;
+    if (!test_noise_generator_node()) return 1;
+    if (!test_noise_generator_same_seed_determinism()) return 1;
+    if (!test_noise_generator_different_seeds_diverge()) return 1;
     if (!test_decimator_node()) return 1;
     if (!test_decimator_factor_four()) return 1;
     if (!test_windowing_node()) return 1;
