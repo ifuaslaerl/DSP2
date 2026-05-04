@@ -2,6 +2,8 @@ import sys
 import os
 import argparse
 import json
+import struct
+import wave
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -43,6 +45,89 @@ def _escape_markdown_cell(value):
 def _log_level_name(log):
     return "INFO" if log.level == core.LogLevel.INFO else "ERROR"
 
+def normalize_samples_for_wav(samples):
+    values = np.asarray(samples, dtype=np.float32)
+    if values.size == 0:
+        return values
+
+    peak = float(np.max(np.abs(values)))
+    if peak <= 0.0:
+        return values
+
+    return values / peak
+
+def resolve_wav_output_paths(output_prefix, wav_format):
+    if wav_format == "pcm16":
+        return {"pcm16": f"{output_prefix}_pcm16.wav"}
+    if wav_format == "float32":
+        return {"float32": f"{output_prefix}_float32.wav"}
+    return {
+        "pcm16": f"{output_prefix}_pcm16.wav",
+        "float32": f"{output_prefix}_float32.wav",
+    }
+
+def write_pcm16_wav(path, samples, sample_rate):
+    output_dir = os.path.dirname(path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    clipped = np.clip(samples, -1.0, 1.0)
+    pcm = np.round(clipped * 32767.0).astype("<i2")
+
+    with wave.open(path, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(int(round(sample_rate)))
+        wav.writeframes(pcm.tobytes())
+
+def write_float32_wav(path, samples, sample_rate):
+    output_dir = os.path.dirname(path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    payload = np.asarray(samples, dtype="<f4").tobytes()
+    byte_rate = int(round(sample_rate)) * 4
+    block_align = 4
+    fmt_chunk_size = 16
+    audio_format_ieee_float = 3
+    data_chunk_size = len(payload)
+    riff_size = 4 + (8 + fmt_chunk_size) + (8 + data_chunk_size)
+
+    with open(path, "wb") as wav:
+        wav.write(b"RIFF")
+        wav.write(struct.pack("<I", riff_size))
+        wav.write(b"WAVE")
+        wav.write(b"fmt ")
+        wav.write(struct.pack("<IHHIIHH", fmt_chunk_size, audio_format_ieee_float, 1, int(round(sample_rate)), byte_rate, block_align, 32))
+        wav.write(b"data")
+        wav.write(struct.pack("<I", data_chunk_size))
+        wav.write(payload)
+
+def export_wav_files(captured_data, node_name, port, output_prefix, wav_format):
+    if node_name not in captured_data:
+        raise ValueError(f"No '{node_name}' nao encontrado nos dados capturados.")
+    if port not in captured_data[node_name]:
+        raise ValueError(f"Porta {port} nao encontrada no no '{node_name}'.")
+
+    payload = captured_data[node_name][port]
+    sample_rate = payload["sample_rate"]
+    samples = normalize_samples_for_wav(payload["samples"])
+    output_paths = resolve_wav_output_paths(output_prefix, wav_format)
+
+    if "pcm16" in output_paths:
+        write_pcm16_wav(output_paths["pcm16"], samples, sample_rate)
+    if "float32" in output_paths:
+        write_float32_wav(output_paths["float32"], samples, sample_rate)
+
+    return {
+        "node": node_name,
+        "port": port,
+        "sample_rate": sample_rate,
+        "sample_count": int(samples.size),
+        "normalization": "peak",
+        "files": output_paths,
+    }
+
 def build_markdown_report(
     graph_data,
     node_ids,
@@ -53,6 +138,7 @@ def build_markdown_report(
     sample_rate,
     block_size,
     num_blocks,
+    wav_export=None,
 ):
     lines = [
         "# D(SP)^2 - Relatorio de Simulacao do Grafo",
@@ -158,6 +244,25 @@ def build_markdown_report(
             )
     else:
         lines.append("Nenhum evento foi coletado do Ring Buffer C++.")
+
+    if wav_export is not None:
+        lines.extend(
+            [
+                "",
+                "## Export WAV",
+                "",
+                f"- No: `{wav_export['node']}`",
+                f"- Porta: `{wav_export['port']}`",
+                f"- Sample rate real: `{_format_metric(wav_export['sample_rate'])}` Hz",
+                f"- Amostras exportadas: `{wav_export['sample_count']}`",
+                f"- Normalizacao: `{wav_export['normalization']}`",
+                "",
+                "| Formato | Arquivo |",
+                "| --- | --- |",
+            ]
+        )
+        for format_name, path in wav_export["files"].items():
+            lines.append(f"| {format_name} | `{_escape_markdown_cell(path)}` |")
 
     lines.append("")
     return "\n".join(lines)
@@ -267,7 +372,7 @@ class DSP2TestHarness:
         plt.close(fig)
         print(f"\n[Tester] Validacao visual guardada em: {output_path}")
 
-    def write_report(self, report_path, data, logs, graph_path, output_path, num_blocks):
+    def write_report(self, report_path, data, logs, graph_path, output_path, num_blocks, wav_export=None):
         report_dir = os.path.dirname(report_path)
         if report_dir:
             os.makedirs(report_dir, exist_ok=True)
@@ -282,6 +387,7 @@ class DSP2TestHarness:
             self.sample_rate,
             self.block_size,
             num_blocks,
+            wav_export,
         )
 
         with open(report_path, "w", encoding="utf-8") as f:
@@ -297,6 +403,10 @@ def main():
     parser.add_argument("-sr", "--samplerate", type=float, default=DEFAULT_SAMPLE_RATE, help="Taxa de Amostragem (Sample Rate)")
     parser.add_argument("-bs", "--blocksize", type=int, default=DEFAULT_BLOCK_SIZE, help="Tamanho do Bloco (Block Size)")
     parser.add_argument("--report", type=str, default=None, help="Caminho de destino do relatorio Markdown")
+    parser.add_argument("--wav-node", type=str, default=None, help="Nome visual do no a exportar para WAV")
+    parser.add_argument("--wav-port", type=int, default=0, help="Porta de saida do no a exportar para WAV")
+    parser.add_argument("--wav-output", type=str, default=None, help="Prefixo dos arquivos WAV gerados")
+    parser.add_argument("--wav-format", choices=["pcm16", "float32", "both"], default="pcm16", help="Formato WAV a exportar")
     
     args = parser.parse_args()
 
@@ -306,8 +416,21 @@ def main():
         tester.load_graph(args.graph)
         data, logs = tester.run_and_capture(args.blocks)
         tester.plot_results(data, args.output)
+        wav_export = None
+        if args.wav_node or args.wav_output:
+            if not args.wav_node or not args.wav_output:
+                raise ValueError("--wav-node e --wav-output devem ser usados em conjunto.")
+            wav_export = export_wav_files(
+                data,
+                args.wav_node,
+                args.wav_port,
+                args.wav_output,
+                args.wav_format,
+            )
+            for format_name, path in wav_export["files"].items():
+                print(f"[Tester] WAV {format_name} guardado em: {path}")
         if args.report:
-            tester.write_report(args.report, data, logs, args.graph, args.output, args.blocks)
+            tester.write_report(args.report, data, logs, args.graph, args.output, args.blocks, wav_export)
     except Exception as e:
         print(f"\n[Falha Critica] {e}")
         sys.exit(1)

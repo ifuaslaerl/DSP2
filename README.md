@@ -222,6 +222,10 @@ Processa um arquivo JSON arbitrário e gera um gráfico de análise em `dev_pane
 python3 dev_panel/signal_tester.py --graph tests/math_test.json --blocks 20 --output dev_panel/results.png
 ```
 
+O `signal_tester.py` funciona como uma bancada offline: lê o JSON, monta o grafo no
+Engine C++, processa os blocos, captura as saídas por nó/porta e então gera
+osciloscópio (`.png`), relatório (`.md`) e, opcionalmente, arquivos `.wav`.
+
 O inspetor também pode gerar um relatório Markdown automático com a topologia do grafo,
 taxas de amostragem reais por saída, métricas por nó/porta (`min`, `max`, `RMS`,
 `peak`, `DC offset`), logs C++ coletados via Ring Buffer e referência à imagem gerada:
@@ -232,6 +236,21 @@ python3 dev_panel/signal_tester.py \
   -o dev_panel/demo_signal.png \
   --report dev_panel/demo_report.md \
   --blocks 8
+```
+
+Para ouvir a saída de um nó específico, exporte a porta desejada como WAV. O exemplo
+abaixo exporta a saída multirate do `Redutor_Multirate` em PCM 16-bit e Float 32-bit:
+
+```bash
+python3 dev_panel/signal_tester.py \
+  -g tests/advanced_test.json \
+  -o dev_panel/demo_signal.png \
+  --report dev_panel/demo_report.md \
+  --wav-node Redutor_Multirate \
+  --wav-port 0 \
+  --wav-output dev_panel/redutor_demo \
+  --wav-format both \
+  --blocks 64
 ```
 
 #### 3. Comparador de Simulações
