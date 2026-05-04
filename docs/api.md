@@ -31,7 +31,32 @@ Funções trigonométricas e logarítmicas que trocam precisão absoluta por vel
 - **Configuração:** O tamanho padrão é definido pela constante `DSP2Config::SINE_LUT_DEFAULT_SIZE` em `core/constants.hpp`.
 - **Notas de Performance:** Implementação $O(1)$ sem chamadas de `std::sin` no loop. Utiliza `DSP2Config::PI` (calculado via `std::acos(-1)`) para a geração inicial da tabela.
 
-## 3. Sistema de Logging (Zero-Cost / Lock-Free)
+## 3. FFT e Análise Espectral
+
+Utilitários para transformar blocos de áudio real em espectros de frequência. Devem ser usados por nós de análise em vez de cada nó implementar uma FFT própria.
+
+### `DSP2FFT::is_power_of_two(int value) -> bool`
+- **Descrição:** Retorna se o tamanho informado é uma potência de 2 válida para a FFT radix-2.
+- **Notas de Performance:** Função inline, $O(1)$, sem alocação.
+
+### `DSP2FFT::next_power_of_two(int value) -> int`
+- **Descrição:** Retorna a menor potência de 2 maior ou igual ao valor informado.
+- **Notas de Performance:** Função inline, usada em fase de negociação/preparação de dimensões.
+
+### `DSP2FFT::RealFFTPlan<T>`
+- **Assinaturas principais:** `bool configure(int requested_size)`, `bool execute(const T* input, int input_size)`, `T real(int bin) const`, `T imag(int bin) const`.
+- **Descrição:** Plano FFT radix-2 para entrada real. `configure()` aloca buffers internos, tabela de bit-reversal e twiddles; `execute()` copia a entrada para workspace pré-alocado, aplica zero-padding quando necessário e executa a FFT.
+- **Notas de Performance:** `execute()` não faz alocação dinâmica, não usa I/O e não chama funções trigonométricas. A geração de twiddles com `<cmath>` ocorre apenas em `configure()`, fora do loop crítico.
+
+### Nó `SpectrumAnalyser`
+- **Tipo de Factory:** `"SpectrumAnalyser"` e alias `"SpectrumAnalyzer"`.
+- **Entradas:** Porta 0 recebe áudio real no domínio do tempo, preferencialmente já passado pelo nó `Windowing`.
+- **Saídas:** Porta 0 emite potência espectral por bin; porta 1 emite a frequência em Hz correspondente a cada bin.
+- **Parâmetros:** `fft_size` opcional. Se ausente ou menor que o bloco de entrada, o nó usa o próximo power-of-two maior ou igual ao bloco de entrada. Se maior que o bloco, aplica zero-padding.
+- **Formato:** Espectro one-sided com `fft_size / 2 + 1` bins, de DC até Nyquist.
+- **Notas de Performance:** A saída usa potência (`real² + imag²`) normalizada por `fft_size²`, evitando `std::sqrt` dentro de `process()`.
+
+## 4. Sistema de Logging (Zero-Cost / Lock-Free)
 
 Para enviar avisos ou capturar exceções matemáticas em tempo real para a interface Python sem causar gargalos na thread, utilize as macros do Core Logger. Elas usam um SPSC Ring Buffer sob o capô, garantindo segurança lock-free de O(1).
 
@@ -43,7 +68,7 @@ Para enviar avisos ou capturar exceções matemáticas em tempo real para a inte
 - **Zero-Allocation:** As macros aceitam **APENAS** literais constantes de string (`const char*`). Nunca utilize formatação dinâmica (como `std::to_string()`) dentro delas para evitar a invocação do *heap*.
 - **Otimização Embarcada:** O uso destas macros é totalmente seguro. Quando compilado com `DSP2_TARGET=EMBEDDED`, o compilador resolve estas chamadas para código vazio, resultando em custo zero de CPU e Memória para o microcontrolador.
 
-## 4. Interface Python (Pybind11)
+## 5. Interface Python (Pybind11)
 
 As funções abaixo estão disponíveis no módulo Python `dsp2._dsp2_core`.
 
@@ -55,7 +80,7 @@ As funções abaixo estão disponíveis no módulo Python `dsp2._dsp2_core`.
 - **Métodos:** `set_signal_parameters`, `prepare_engine`, `process_block`.
 - **Tipo:** Instanciado em Python para rodar a simulação com precisão de 64-bits (`double`).
 
-## 5. NodeFactory e Criação Dinâmica (Fase 3.3)
+## 6. NodeFactory e Criação Dinâmica (Fase 3.3)
 Para permitir que a interface Python (ou arquivos JSON) construa grafos de processamento sem necessidade de recompilar o motor, o $D(SP)^2$ utiliza um padrão Factory centralizado no arquivo `core/node_factory.hpp`.
 
 **Regra Estrita para Agentes de IA:**
@@ -71,7 +96,7 @@ Sempre que você criar um novo arquivo de nó em `nodes_cpp/` (ex: `meu_filtro.h
   });
   ```
 
-## 6. Parâmetros em Array e Multirate (Novas APIs Fase 4.1)
+## 7. Parâmetros em Array e Multirate (Novas APIs Fase 4.1)
 
 Para suportar filtros avançados como Convolução (FIR) estrita no domínio do tempo, o D(SP)^2 agora suporta injeção de *Arrays* a partir do JSON diretamente para os nós C++.
 

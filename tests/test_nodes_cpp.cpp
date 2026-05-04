@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "../core/engine.hpp"
+#include "../core/fft.hpp"
 #include "../core/graph.hpp"
 #include "../core/node_base.hpp"
 #include "../nodes_cpp/butterworth_filter.hpp"
@@ -12,6 +13,7 @@
 #include "../nodes_cpp/math_nodes.hpp"
 #include "../nodes_cpp/noise_generator.hpp"
 #include "../nodes_cpp/quadrature_modulator.hpp"
+#include "../nodes_cpp/spectrum_analyser.hpp"
 #include "../nodes_cpp/windowing.hpp"
 
 namespace {
@@ -374,6 +376,112 @@ bool test_audio_file_input_node_streams_samples_and_pads_eof() {
     }
 
     return true;
+}
+
+bool test_real_fft_plan_impulse_response() {
+    DSP2FFT::RealFFTPlan<double> plan;
+    if (!expect_true(plan.configure(8), "RealFFTPlan must configure power-of-two size.")) {
+        return false;
+    }
+
+    const double input[8] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    if (!expect_true(plan.execute(input, 8), "RealFFTPlan must execute impulse input.")) {
+        return false;
+    }
+
+    for (int bin = 0; bin < 8; ++bin) {
+        const double power = (plan.real(bin) * plan.real(bin)) + (plan.imag(bin) * plan.imag(bin));
+        if (!nearly_equal(power, 1.0, kLooseTolerance)) {
+            std::cout << "FAIL: FFT impulse bin " << bin << " expected power 1, got "
+                      << power << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_spectrum_analyser_dimensions_and_frequencies() {
+    Engine<double> engine;
+    engine.set_signal_parameters(8000.0, 10);
+    const int audio = engine.add_node("AudioFileInput");
+    const int analyser = engine.add_node("SpectrumAnalyser");
+    if (!expect_true(audio >= 0 && analyser >= 0,
+                     "SpectrumAnalyser dimension test nodes must be created.")) {
+        return false;
+    }
+
+    engine.set_node_parameter_array(audio, "samples", {1.0, 0.0, 0.0, 0.0, 0.0});
+    engine.set_node_parameter(analyser, "fft_size", 16.0);
+    engine.add_edge(audio, 0, analyser, 0);
+    engine.prepare_engine();
+    engine.process_block();
+
+    if (!expect_true(engine.get_node_output_port_count(analyser) == 2,
+                     "SpectrumAnalyser must expose power and frequency ports.")) {
+        return false;
+    }
+
+    const std::vector<double> power = engine.get_node_output(analyser, 0);
+    const std::vector<double> frequencies = engine.get_node_output(analyser, 1);
+    if (!expect_true(static_cast<int>(power.size()) == 9 &&
+                     static_cast<int>(frequencies.size()) == 9,
+                     "SpectrumAnalyser must output fft_size/2 + 1 bins.")) {
+        return false;
+    }
+
+    for (int bin = 0; bin < 9; ++bin) {
+        const double expected_frequency = static_cast<double>(bin) * 8000.0 / 16.0;
+        if (!nearly_equal(frequencies[bin], expected_frequency, kLooseTolerance)) {
+            std::cout << "FAIL: Spectrum frequency bin " << bin << " expected "
+                      << expected_frequency << ", got " << frequencies[bin] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_spectrum_analyser_detects_aligned_sine_bin() {
+    Engine<double> engine;
+    engine.set_signal_parameters(16.0, 16);
+    const int audio = engine.add_node("AudioFileInput");
+    const int analyser = engine.add_node("SpectrumAnalyzer");
+    if (!expect_true(audio >= 0 && analyser >= 0,
+                     "SpectrumAnalyzer alias test nodes must be created.")) {
+        return false;
+    }
+
+    std::vector<double> samples(16, 0.0);
+    for (int i = 0; i < 16; ++i) {
+        samples[static_cast<size_t>(i)] = std::sin(2.0 * kPi * 3.0 * static_cast<double>(i) / 16.0);
+    }
+
+    engine.set_node_parameter_array(audio, "samples", samples);
+    engine.set_node_parameter(analyser, "fft_size", 16.0);
+    engine.add_edge(audio, 0, analyser, 0);
+    engine.prepare_engine();
+    engine.process_block();
+
+    const std::vector<double> power = engine.get_node_output(analyser, 0);
+    if (!expect_true(static_cast<int>(power.size()) == 9,
+                     "SpectrumAnalyzer alias output must expose one-sided bins.")) {
+        return false;
+    }
+
+    int max_bin = 0;
+    for (int bin = 1; bin < static_cast<int>(power.size()); ++bin) {
+        if (power[bin] > power[max_bin]) {
+            max_bin = bin;
+        }
+    }
+
+    if (!expect_true(max_bin == 3, "SpectrumAnalyser must peak at the aligned sine bin.")) {
+        std::cout << "FAIL: Spectrum max bin expected 3, got " << max_bin << ".\n";
+        return false;
+    }
+
+    return expect_true(power[3] > 0.20, "Spectrum aligned sine bin must carry strong power.");
 }
 
 bool test_decimator_node() {
@@ -799,6 +907,9 @@ int main() {
     if (!test_noise_generator_same_seed_determinism()) return 1;
     if (!test_noise_generator_different_seeds_diverge()) return 1;
     if (!test_audio_file_input_node_streams_samples_and_pads_eof()) return 1;
+    if (!test_real_fft_plan_impulse_response()) return 1;
+    if (!test_spectrum_analyser_dimensions_and_frequencies()) return 1;
+    if (!test_spectrum_analyser_detects_aligned_sine_bin()) return 1;
     if (!test_decimator_node()) return 1;
     if (!test_decimator_factor_four()) return 1;
     if (!test_windowing_node()) return 1;

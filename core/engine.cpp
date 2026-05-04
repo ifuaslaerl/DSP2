@@ -13,6 +13,7 @@
 #include "../nodes_cpp/butterworth_filter.hpp"
 #include "../nodes_cpp/convolution.hpp"
 #include "../nodes_cpp/quadrature_modulator.hpp"
+#include "../nodes_cpp/spectrum_analyser.hpp"
 
 // ==========================================
 // Função Global de Registro de Nós
@@ -34,6 +35,8 @@ void register_core_nodes() {
     NodeFactory<double>::get_instance().register_node("ButterworthFilter", [](){ return new ButterworthFilter<double>(); });
     NodeFactory<double>::get_instance().register_node("Convolution", [](){ return new Convolution<double>(); });
     NodeFactory<double>::get_instance().register_node("QuadratureModulator", [](){ return new QuadratureModulator<double>(); });
+    NodeFactory<double>::get_instance().register_node("SpectrumAnalyser", [](){ return new SpectrumAnalyser<double>(); });
+    NodeFactory<double>::get_instance().register_node("SpectrumAnalyzer", [](){ return new SpectrumAnalyser<double>(); });
 }
 
 // ==========================================
