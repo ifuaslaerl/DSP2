@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <string>
 #include "graph.hpp"
 #include "constants.hpp"
@@ -11,7 +12,7 @@ template <typename T>
 class Engine {
 private:
     // O Engine e dono do grafo principal e o libera no destrutor.
-    Graph<T>* graph;
+    std::unique_ptr<Graph<T>> graph;
     
     // Parâmetros globais de processamento
     double sampleRate;

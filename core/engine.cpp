@@ -37,20 +37,15 @@ void register_core_nodes() {
 // ==========================================
 
 template <typename T>
-Engine<T>::Engine() : sampleRate(DSP2Config::DEFAULT_SAMPLE_RATE), blockSize(DSP2Config::DEFAULT_BLOCK_SIZE) {
-    // Instancia o grafo principal do motor
-    graph = new Graph<T>();
-
+Engine<T>::Engine()
+    : graph(std::make_unique<Graph<T>>()),
+      sampleRate(DSP2Config::DEFAULT_SAMPLE_RATE),
+      blockSize(DSP2Config::DEFAULT_BLOCK_SIZE) {
     register_core_nodes();
 }
 
 template <typename T>
-Engine<T>::~Engine() {
-    if (graph != nullptr) {
-        delete graph;
-        graph = nullptr;
-    }
-}
+Engine<T>::~Engine() = default;
 
 // ==========================================
 // Configuração
