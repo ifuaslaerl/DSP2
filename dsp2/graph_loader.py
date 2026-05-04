@@ -1,5 +1,7 @@
 import json
+import os
 import dsp2._dsp2_core as core
+from dsp2.audio_io import load_wav_mono
 
 class GraphLoader:
     @staticmethod
@@ -26,6 +28,17 @@ class GraphLoader:
             # [NOVO] Leitura Inteligente de Parametros (Escalares vs Arrays)
             if 'parameters' in node:
                 for param_name, value in node['parameters'].items():
+                    if node_type == "AudioFileInput" and param_name == "path":
+                        wav_path = value
+                        if not os.path.isabs(wav_path):
+                            wav_path = os.path.join(os.path.dirname(filepath), wav_path)
+                        samples, sample_rate = load_wav_mono(wav_path)
+                        engine.set_node_parameter_array(node_id, "samples", samples)
+                        print(
+                            f"    - WAV carregado: {wav_path} "
+                            f"({len(samples)} amostras, {sample_rate} Hz)"
+                        )
+                        continue
                     if isinstance(value, list):
                         # Se for uma lista no JSON, envia como Array para o C++
                         engine.set_node_parameter_array(node_id, param_name, value)

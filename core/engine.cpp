@@ -5,6 +5,7 @@
 #include "../nodes_cpp/math_nodes.hpp"
 #include "../nodes_cpp/oscillator_nodes.hpp"
 #include "../nodes_cpp/noise_generator.hpp"
+#include "../nodes_cpp/audio_file_input.hpp"
 
 // [NOVO] Headers dos Vértices Avançados
 #include "../nodes_cpp/decimator.hpp"
@@ -25,6 +26,7 @@ void register_core_nodes() {
     NodeFactory<double>::get_instance().register_node("Constant", [](){ return new ConstantNode<double>(); });
     NodeFactory<double>::get_instance().register_node("SineOscillator", [](){ return new SineOscillator<double>(); });
     NodeFactory<double>::get_instance().register_node("NoiseGenerator", [](){ return new NoiseGenerator<double>(); });
+    NodeFactory<double>::get_instance().register_node("AudioFileInput", [](){ return new AudioFileInput<double>(); });
 
     // [NOVO] Nós Avançados (SDF, FIR, IIR, I/Q)
     NodeFactory<double>::get_instance().register_node("Decimator", [](){ return new Decimator<double>(); });

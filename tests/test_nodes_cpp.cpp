@@ -6,6 +6,7 @@
 #include "../core/graph.hpp"
 #include "../core/node_base.hpp"
 #include "../nodes_cpp/butterworth_filter.hpp"
+#include "../nodes_cpp/audio_file_input.hpp"
 #include "../nodes_cpp/convolution.hpp"
 #include "../nodes_cpp/decimator.hpp"
 #include "../nodes_cpp/math_nodes.hpp"
@@ -334,6 +335,45 @@ bool test_noise_generator_different_seeds_diverge() {
     }
 
     return expect_true(false, "NoiseGenerator different seeds must produce different output.");
+}
+
+bool test_audio_file_input_node_streams_samples_and_pads_eof() {
+    Engine<double> engine;
+    engine.set_signal_parameters(44100.0, 4);
+    const int audio = engine.add_node("AudioFileInput");
+    if (!expect_true(audio >= 0, "AudioFileInput node must be created.")) return false;
+
+    engine.set_node_parameter_array(audio, "samples", {0.25, -0.5, 0.75, -1.0, 0.5});
+    engine.prepare_engine();
+
+    engine.process_block();
+    const std::vector<double> first = engine.get_node_output(audio, 0);
+    if (!expect_true(static_cast<int>(first.size()) == 4,
+                     "AudioFileInput first block must preserve block size.")) {
+        return false;
+    }
+
+    const double expected_first[4] = {0.25, -0.5, 0.75, -1.0};
+    for (int i = 0; i < 4; ++i) {
+        if (!nearly_equal(first[i], expected_first[i])) {
+            std::cout << "FAIL: AudioFileInput first block sample " << i
+                      << " expected " << expected_first[i] << ", got " << first[i] << ".\n";
+            return false;
+        }
+    }
+
+    engine.process_block();
+    const std::vector<double> second = engine.get_node_output(audio, 0);
+    const double expected_second[4] = {0.5, 0.0, 0.0, 0.0};
+    for (int i = 0; i < 4; ++i) {
+        if (!nearly_equal(second[i], expected_second[i])) {
+            std::cout << "FAIL: AudioFileInput second block sample " << i
+                      << " expected " << expected_second[i] << ", got " << second[i] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool test_decimator_node() {
@@ -758,6 +798,7 @@ int main() {
     if (!test_noise_generator_node()) return 1;
     if (!test_noise_generator_same_seed_determinism()) return 1;
     if (!test_noise_generator_different_seeds_diverge()) return 1;
+    if (!test_audio_file_input_node_streams_samples_and_pads_eof()) return 1;
     if (!test_decimator_node()) return 1;
     if (!test_decimator_factor_four()) return 1;
     if (!test_windowing_node()) return 1;
