@@ -253,7 +253,24 @@ python3 dev_panel/signal_tester.py \
   --blocks 64
 ```
 
-#### 3. Comparador de Simulações
+#### 3. Exportador WAV para MIDI
+O MVP de transcrição offline usa a cadeia `AudioFileInput -> Windowing ->
+SpectrumAnalyzer -> SpectralPeakPicker -> FrequencyToMidiNote` e grava um arquivo
+MIDI tipo 0 sem dependências Python externas:
+
+```bash
+python3 dev_panel/audio_to_midi.py \
+  --input caminho/para/musica.wav \
+  --output dev_panel/musica.mid \
+  --block-size 2048 \
+  --peak-count 6
+```
+
+Cada bloco de análise vira um frame MIDI. As frequências mais fortes detectadas no
+bloco são exportadas como notas simultâneas, e notas repetidas em blocos
+consecutivos são sustentadas em vez de reacionadas.
+
+#### 4. Comparador de Simulações
 Compara duas versões de um grafo e gera um relatório Markdown com as diferenças de
 métricas por nó/porta. Isto é útil para validar o impacto de alterações em filtros,
 decimadores e novos nós C++:

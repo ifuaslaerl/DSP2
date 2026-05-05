@@ -7,6 +7,7 @@ import unittest
 import wave
 
 import dsp2._dsp2_core as core
+from dev_panel.audio_to_midi import export_audio_to_midi
 from dsp2.graph_loader import GraphLoader
 
 
@@ -300,6 +301,51 @@ class PythonJsonE2ETest(unittest.TestCase):
             self.assertIn(55.0, midi_notes)
             self.assertGreater(peak_powers[0], 0.0)
             self.assertGreater(peak_powers[1], 0.0)
+
+    def test_audio_to_midi_export_from_wav_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "two_sines.wav")
+            midi_path = os.path.join(tmpdir, "two_sines.mid")
+
+            sample_rate = 1024
+            block_size = 256
+            first_freq = 80.0
+            second_freq = 200.0
+            pcm_samples = []
+            for i in range(block_size):
+                value = (
+                    math.sin(2.0 * math.pi * first_freq * i / sample_rate)
+                    + 0.7 * math.sin(2.0 * math.pi * second_freq * i / sample_rate)
+                )
+                pcm_samples.append(int(round((value / 1.7) * 30000.0)))
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            result = export_audio_to_midi(
+                wav_path,
+                midi_path,
+                block_size=block_size,
+                fft_size=block_size,
+                peak_count=2,
+                threshold=0.001,
+                min_bin_distance=2,
+            )
+
+            self.assertTrue(os.path.exists(midi_path))
+            self.assertEqual(result["block_count"], 1)
+            self.assertIn(39, result["frames"][0])
+            self.assertIn(55, result["frames"][0])
+
+            with open(midi_path, "rb") as midi_file:
+                payload = midi_file.read()
+
+            self.assertEqual(payload[0:4], b"MThd")
+            self.assertIn(bytes([0x90, 39, 96]), payload)
+            self.assertIn(bytes([0x90, 55, 96]), payload)
 
 
 if __name__ == "__main__":
