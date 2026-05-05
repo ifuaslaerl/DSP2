@@ -11,6 +11,25 @@ from dsp2.audio_to_midi import collect_midi_note_frames, export_audio_to_midi
 from dsp2.graph_loader import GraphLoader
 
 
+def midi_note_to_frequency(note):
+    return 440.0 * (2.0 ** ((note - 69.0) / 12.0))
+
+
+def extract_note_on_channels(midi_bytes):
+    channels = []
+    index = 0
+    while index < len(midi_bytes):
+        status = midi_bytes[index]
+        if 0x90 <= status <= 0x9F and index + 2 < len(midi_bytes):
+            velocity = midi_bytes[index + 2]
+            if velocity > 0:
+                channels.append((status & 0x0F) + 1)
+            index += 3
+        else:
+            index += 1
+    return channels
+
+
 class PythonJsonE2ETest(unittest.TestCase):
     def write_graph(self, data):
         handle = tempfile.NamedTemporaryFile(
@@ -346,6 +365,99 @@ class PythonJsonE2ETest(unittest.TestCase):
             self.assertEqual(payload[0:4], b"MThd")
             self.assertIn(bytes([0x90, 39, 96]), payload)
             self.assertIn(bytes([0x90, 55, 96]), payload)
+
+    def test_audio_to_midi_melody_mode_tracks_synthetic_melody(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "melody.wav")
+            midi_path = os.path.join(tmpdir, "melody.mid")
+
+            sample_rate = 8192
+            block_size = 1024
+            melody_notes = [60, 62, 64]
+            pcm_samples = []
+            for note in melody_notes:
+                frequency = midi_note_to_frequency(note)
+                for i in range(block_size * 2):
+                    value = math.sin(2.0 * math.pi * frequency * i / sample_rate)
+                    pcm_samples.append(int(round(value * 26000.0)))
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            result = export_audio_to_midi(
+                wav_path,
+                midi_path,
+                block_size=block_size,
+                fft_size=block_size,
+                mode="melody",
+                min_midi_note=48,
+                max_midi_note=72,
+                min_confidence=0.05,
+                min_note_frames=1,
+            )
+
+            detected_notes = [frame[0] for frame in result["frames"] if frame]
+            self.assertTrue(os.path.exists(midi_path))
+            self.assertEqual(result["mode"], "melody")
+            for note in melody_notes:
+                self.assertIn(note, detected_notes)
+
+    def test_audio_to_midi_motor_modes_are_exposed_by_export(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "melody.wav")
+
+            sample_rate = 8192
+            block_size = 1024
+            notes = [60, 62, 64]
+            pcm_samples = []
+            for note in notes:
+                frequency = midi_note_to_frequency(note)
+                for i in range(block_size):
+                    value = math.sin(2.0 * math.pi * frequency * i / sample_rate)
+                    pcm_samples.append(int(round(value * 26000.0)))
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            single_path = os.path.join(tmpdir, "single.mid")
+            unison_path = os.path.join(tmpdir, "unison.mid")
+            round_robin_path = os.path.join(tmpdir, "round_robin.mid")
+
+            common_kwargs = {
+                "block_size": block_size,
+                "fft_size": block_size,
+                "mode": "melody",
+                "min_midi_note": 48,
+                "max_midi_note": 72,
+                "min_confidence": 0.05,
+                "min_note_frames": 1,
+            }
+            export_audio_to_midi(wav_path, single_path, motor_mode="single", **common_kwargs)
+            export_audio_to_midi(wav_path, unison_path, motor_mode="unison", **common_kwargs)
+            export_audio_to_midi(
+                wav_path,
+                round_robin_path,
+                motor_mode="round-robin",
+                **common_kwargs,
+            )
+
+            with open(single_path, "rb") as midi_file:
+                single_channels = extract_note_on_channels(midi_file.read())
+            with open(unison_path, "rb") as midi_file:
+                unison_channels = extract_note_on_channels(midi_file.read())
+            with open(round_robin_path, "rb") as midi_file:
+                round_robin_channels = extract_note_on_channels(midi_file.read())
+
+            self.assertTrue(single_channels)
+            self.assertEqual(set(single_channels), {1})
+            self.assertTrue(set(range(1, 7)).issubset(set(unison_channels)))
+            self.assertGreaterEqual(len(set(round_robin_channels)), 2)
 
     def test_audio_to_midi_collects_empty_frames_for_silence(self):
         with tempfile.TemporaryDirectory() as tmpdir:

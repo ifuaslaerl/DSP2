@@ -15,6 +15,7 @@
 #include "../nodes_cpp/quadrature_modulator.hpp"
 #include "../nodes_cpp/spectrum_analyser.hpp"
 #include "../nodes_cpp/spectral_peak_picker.hpp"
+#include "../nodes_cpp/harmonic_pitch_detector.hpp"
 #include "../nodes_cpp/frequency_to_midi_note.hpp"
 #include "../nodes_cpp/windowing.hpp"
 
@@ -685,6 +686,145 @@ bool test_frequency_to_midi_note_factory() {
     return expect_true(node >= 0, "FrequencyToMidiNote node must be created by factory.");
 }
 
+bool test_harmonic_pitch_detector_factory() {
+    Engine<double> engine;
+    const int node = engine.add_node("HarmonicPitchDetector");
+    return expect_true(node >= 0, "HarmonicPitchDetector node must be created by factory.");
+}
+
+bool test_harmonic_pitch_detector_detects_pure_sine_peak() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 0.0, 0.0, 10.0, 0.0, 0.0},
+        {0.0, 110.0, 220.0, 440.0, 660.0, 880.0}
+    );
+    auto* detector = new HarmonicPitchDetector<double>();
+    auto* converter = new FrequencyToMidiNote<double>();
+
+    graph.add_node(source);
+    graph.add_node(detector);
+    graph.add_node(converter);
+    graph.set_node_parameter(1, "min_midi_note", 60.0);
+    graph.set_node_parameter(1, "max_midi_note", 72.0);
+    graph.set_node_parameter(1, "min_confidence", 0.1);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.add_edge(1, 0, 2, 0);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    const double* frequency = graph.get_node_output_buffer(1, 0);
+    const double* confidence = graph.get_node_output_buffer(1, 1);
+    const double* notes = graph.get_node_output_buffer(2, 0);
+    if (!expect_true(frequency != nullptr && confidence != nullptr && notes != nullptr,
+                     "HarmonicPitchDetector pure sine outputs must be readable.")) {
+        return false;
+    }
+
+    if (!expect_true(notes[0] == 69.0, "HarmonicPitchDetector must detect A4.")) {
+        std::cout << "FAIL: HarmonicPitchDetector pure sine expected MIDI 69, got "
+                  << notes[0] << " from frequency " << frequency[0] << ".\n";
+        return false;
+    }
+
+    return expect_true(confidence[0] > 0.9,
+                       "HarmonicPitchDetector pure sine confidence must be high.");
+}
+
+bool test_harmonic_pitch_detector_handles_weak_fundamental() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 1.0, 6.0, 5.0, 4.0, 3.0, 2.0},
+        {0.0, 110.0, 220.0, 330.0, 440.0, 550.0, 660.0}
+    );
+    auto* detector = new HarmonicPitchDetector<double>();
+    auto* converter = new FrequencyToMidiNote<double>();
+
+    graph.add_node(source);
+    graph.add_node(detector);
+    graph.add_node(converter);
+    graph.set_node_parameter(1, "min_midi_note", 40.0);
+    graph.set_node_parameter(1, "max_midi_note", 60.0);
+    graph.set_node_parameter(1, "harmonic_count", 6.0);
+    graph.set_node_parameter(1, "relative_threshold", 0.05);
+    graph.set_node_parameter(1, "min_confidence", 0.1);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.add_edge(1, 0, 2, 0);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    const double* notes = graph.get_node_output_buffer(2, 0);
+    if (!expect_true(notes != nullptr,
+                     "HarmonicPitchDetector weak fundamental note must be readable.")) {
+        return false;
+    }
+
+    if (!expect_true(notes[0] == 45.0,
+                     "HarmonicPitchDetector must infer A2 from harmonic support.")) {
+        std::cout << "FAIL: HarmonicPitchDetector weak fundamental expected MIDI 45, got "
+                  << notes[0] << ".\n";
+        return false;
+    }
+
+    return true;
+}
+
+bool test_harmonic_pitch_detector_silence_returns_zero() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 0.0, 0.0, 0.0},
+        {0.0, 110.0, 220.0, 330.0}
+    );
+    auto* detector = new HarmonicPitchDetector<double>();
+
+    graph.add_node(source);
+    graph.add_node(detector);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    const double* frequency = graph.get_node_output_buffer(1, 0);
+    const double* confidence = graph.get_node_output_buffer(1, 1);
+    if (!expect_true(frequency != nullptr && confidence != nullptr,
+                     "HarmonicPitchDetector silence outputs must be readable.")) {
+        return false;
+    }
+
+    return expect_true(nearly_equal(frequency[0], 0.0) && nearly_equal(confidence[0], 0.0),
+                       "HarmonicPitchDetector silence must return zero frequency and confidence.");
+}
+
+bool test_harmonic_pitch_detector_ignores_notes_outside_range() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 10.0, 0.0, 0.0},
+        {0.0, 440.0, 880.0, 1320.0}
+    );
+    auto* detector = new HarmonicPitchDetector<double>();
+
+    graph.add_node(source);
+    graph.add_node(detector);
+    graph.set_node_parameter(1, "min_midi_note", 36.0);
+    graph.set_node_parameter(1, "max_midi_note", 60.0);
+    graph.set_node_parameter(1, "harmonic_count", 1.0);
+    graph.set_node_parameter(1, "min_confidence", 0.1);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    const double* frequency = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(frequency != nullptr,
+                     "HarmonicPitchDetector out-of-range output must be readable.")) {
+        return false;
+    }
+
+    return expect_true(nearly_equal(frequency[0], 0.0),
+                       "HarmonicPitchDetector must ignore pitches outside configured range.");
+}
+
 bool test_frequency_to_midi_note_converts_known_frequencies() {
     Graph<double> graph;
     auto* source = new FrequencyFrameSource(
@@ -1184,6 +1324,11 @@ int main() {
     if (!test_spectral_peak_picker_selects_strongest_local_peaks()) return 1;
     if (!test_spectral_peak_picker_filters_and_pads()) return 1;
     if (!test_spectral_peak_picker_min_bin_distance_replaces_weaker_neighbor()) return 1;
+    if (!test_harmonic_pitch_detector_factory()) return 1;
+    if (!test_harmonic_pitch_detector_detects_pure_sine_peak()) return 1;
+    if (!test_harmonic_pitch_detector_handles_weak_fundamental()) return 1;
+    if (!test_harmonic_pitch_detector_silence_returns_zero()) return 1;
+    if (!test_harmonic_pitch_detector_ignores_notes_outside_range()) return 1;
     if (!test_frequency_to_midi_note_factory()) return 1;
     if (!test_frequency_to_midi_note_converts_known_frequencies()) return 1;
     if (!test_frequency_to_midi_note_rounds_nearest_note()) return 1;

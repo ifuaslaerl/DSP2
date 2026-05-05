@@ -254,22 +254,75 @@ python3 dev_panel/signal_tester.py \
 ```
 
 #### 3. Exportador WAV para MIDI
-O MVP de transcrição offline usa a cadeia `AudioFileInput -> Windowing ->
-SpectrumAnalyzer -> SpectralPeakPicker -> FrequencyToMidiNote` e grava um arquivo
-MIDI tipo 0 sem dependências Python externas:
+O exportador offline grava um arquivo MIDI tipo 0 sem dependências Python externas.
+Há dois modos de análise:
+
+- `peaks`: exporta os picos espectrais mais fortes de cada bloco. É útil para
+  inspecionar conteúdo espectral, mas pode transformar harmônicos em notas extras.
+- `melody`: estima uma fundamental monofônica por bloco usando reforço harmônico,
+  estabiliza a nota no pós-processamento e tende a produzir melodias mais
+  reconhecíveis para cello, voz e outros instrumentos monofônicos.
+
+O modo histórico por picos usa a cadeia `AudioFileInput -> Windowing ->
+SpectrumAnalyzer -> SpectralPeakPicker -> FrequencyToMidiNote`:
 
 ```bash
 python3 -m dsp2.audio_to_midi \
   --input caminho/para/musica.wav \
   --output dev_panel/musica.mid \
+  --mode peaks \
   --block-size 2048 \
   --peak-count 6 \
   --threshold 0.0001
 ```
 
-Cada bloco de análise vira um frame MIDI. As frequências mais fortes detectadas no
-bloco são exportadas como notas simultâneas, e notas repetidas em blocos
-consecutivos são sustentadas em vez de reacionadas.
+No modo `peaks`, cada bloco de análise vira um frame MIDI. As frequências mais
+fortes detectadas no bloco são exportadas como notas simultâneas, e notas
+repetidas em blocos consecutivos são sustentadas em vez de reacionadas.
+
+Para transcrição melódica, use `--mode melody`. Este modo troca o `SpectralPeakPicker`
+por `HarmonicPitchDetector` e passa pela cadeia `AudioFileInput -> Windowing ->
+SpectrumAnalyzer -> HarmonicPitchDetector -> FrequencyToMidiNote`:
+
+```bash
+python3 -m dsp2.audio_to_midi \
+  --input caminho/para/musica.wav \
+  --output dev_panel/musica_melody.mid \
+  --mode melody \
+  --motor-mode single \
+  --block-size 2048 \
+  --fft-size 4096 \
+  --min-midi-note 36 \
+  --max-midi-note 84 \
+  --harmonic-count 6 \
+  --relative-threshold 0.03 \
+  --min-confidence 0.08 \
+  --min-note-frames 2 \
+  --merge-gap-frames 1
+```
+
+`--motor-mode` controla os canais MIDI usados pela orquestra de 6 motores:
+
+- `single`: envia a melodia apenas para o canal 1.
+- `unison`: replica cada nota nos canais 1..6.
+- `round-robin`: distribui notas sucessivas entre os canais 1..6.
+
+Importante: o exportador atual gera um único arquivo `.mid` tipo 0, com uma única
+track MIDI interna. A separação para a orquestra é feita por canal MIDI, não por
+seis arquivos nem por seis tracks separadas. Assim, para a orquestra de 6 motores,
+o leitor MIDI deve rotear:
+
+- canal 1 para o motor 1;
+- canal 2 para o motor 2;
+- canal 3 para o motor 3;
+- canal 4 para o motor 4;
+- canal 5 para o motor 5;
+- canal 6 para o motor 6.
+
+Se o hardware estiver configurado para receber seis arquivos MIDI independentes
+ou um arquivo MIDI tipo 1 com seis tracks separadas, será necessário um passo de
+split por canal antes de enviar para os motores. Esse split ainda não é feito pelo
+exportador padrão.
 
 Para um primeiro teste, use uma melodia simples como `Twinkle Twinkle Little Star`
 no Wikimedia Commons:
@@ -287,12 +340,28 @@ harmônicos e ruído de fundo em notas. Para cello, voz ou instrumentos monofôn
 comece com `0.0001`. Se o MIDI sair quase vazio, tente `0.00001`; se sair poluído,
 tente `0.001`.
 
+No modo `melody`, `--threshold` é secundário. Os controles principais são
+`--relative-threshold`, que ignora bins fracos em relação ao maior pico do bloco,
+`--min-confidence`, que descarta fundamentais pouco confiáveis, e a faixa
+`--min-midi-note`/`--max-midi-note`, que limita a região analisada.
+
 O mesmo fluxo está disponível como API pública:
 
 ```python
 from dsp2.audio_to_midi import export_audio_to_midi
 
 export_audio_to_midi("musica.wav", "musica.mid", peak_count=6, threshold=0.0001)
+
+export_audio_to_midi(
+    "musica.wav",
+    "musica_melody.mid",
+    mode="melody",
+    motor_mode="single",
+    min_midi_note=36,
+    max_midi_note=84,
+    relative_threshold=0.03,
+    min_confidence=0.08,
+)
 ```
 
 #### 4. Comparador de Simulações

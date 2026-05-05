@@ -72,6 +72,16 @@ Utilitários para transformar blocos de áudio real em espectros de frequência.
 - **Notas de Performance:** A seleção usa buffers internos pré-alocados e inserção ordenada top-N, sem `std::sort`, alocação dinâmica ou I/O dentro de `process()`.
 - **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker`.
 
+### Nó `HarmonicPitchDetector`
+- **Tipo de Factory:** `"HarmonicPitchDetector"`.
+- **Entradas:** Porta 0 recebe potência por bin; porta 1 recebe frequência em Hz por bin. Uso esperado após `SpectrumAnalyser`.
+- **Saídas:** Porta 0 emite a frequência fundamental estimada em Hz; porta 1 emite a confiança normalizada da estimativa no intervalo `0..1`.
+- **Parâmetros:** `min_midi_note` (default `36`), `max_midi_note` (default `84`), `harmonic_count` (default `6`), `relative_threshold` (default `0.05`) e `min_confidence` (default `0.2`).
+- **Critério de Pitch:** Cada nota MIDI candidata dentro da faixa configurada é convertida para frequência fundamental e pontuada pela energia encontrada nos harmônicos esperados. Harmônicos mais altos recebem pesos decrescentes `1 / harmonic_index`; bins abaixo do limiar relativo ao maior pico do bloco são ignorados. A melhor fundamental só é emitida se a confiança ultrapassar `min_confidence`; silêncio ou baixa confiança retornam frequência `0`.
+- **Formato:** As saídas têm tamanho fixo `1`, produzindo uma nota monofônica por bloco de análise.
+- **Notas de Performance:** As frequências candidatas e pesos harmônicos são pré-calculados em `prepare()`. O `process()` não aloca memória, não faz I/O e não chama `<cmath>`; ele percorre candidatos, harmônicos e bins com loops simples.
+- **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> HarmonicPitchDetector -> FrequencyToMidiNote`.
+
 ### Nó `FrequencyToMidiNote`
 - **Tipo de Factory:** `"FrequencyToMidiNote"`.
 - **Entradas:** Porta 0 recebe frequências em Hz, tipicamente a saída de frequências do `SpectralPeakPicker`.
