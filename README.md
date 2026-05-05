@@ -259,16 +259,41 @@ SpectrumAnalyzer -> SpectralPeakPicker -> FrequencyToMidiNote` e grava um arquiv
 MIDI tipo 0 sem dependências Python externas:
 
 ```bash
-python3 dev_panel/audio_to_midi.py \
+python3 -m dsp2.audio_to_midi \
   --input caminho/para/musica.wav \
   --output dev_panel/musica.mid \
   --block-size 2048 \
-  --peak-count 6
+  --peak-count 6 \
+  --threshold 0.0001
 ```
 
 Cada bloco de análise vira um frame MIDI. As frequências mais fortes detectadas no
 bloco são exportadas como notas simultâneas, e notas repetidas em blocos
 consecutivos são sustentadas em vez de reacionadas.
+
+Para um primeiro teste, use uma melodia simples como `Twinkle Twinkle Little Star`
+no Wikimedia Commons:
+<https://commons.wikimedia.org/wiki/File:Twinkle_Twinkle_Little_Star_plain.ogg>.
+Depois de baixar o `.ogg`, converta para WAV PCM antes de chamar o DSP2:
+
+```bash
+ffmpeg -y -i Twinkle_Twinkle_Little_Star_plain.ogg -ac 1 -ar 44100 twinkle.wav
+```
+
+O parâmetro `--threshold` define a potência espectral mínima para uma frequência
+virar nota MIDI. Valores maiores deixam o resultado mais seletivo, com menos notas
+e menos ruído; valores menores capturam mais detalhes, mas também podem transformar
+harmônicos e ruído de fundo em notas. Para cello, voz ou instrumentos monofônicos,
+comece com `0.0001`. Se o MIDI sair quase vazio, tente `0.00001`; se sair poluído,
+tente `0.001`.
+
+O mesmo fluxo está disponível como API pública:
+
+```python
+from dsp2.audio_to_midi import export_audio_to_midi
+
+export_audio_to_midi("musica.wav", "musica.mid", peak_count=6, threshold=0.0001)
+```
 
 #### 4. Comparador de Simulações
 Compara duas versões de um grafo e gera um relatório Markdown com as diferenças de

@@ -7,7 +7,7 @@ import unittest
 import wave
 
 import dsp2._dsp2_core as core
-from dev_panel.audio_to_midi import export_audio_to_midi
+from dsp2.audio_to_midi import collect_midi_note_frames, export_audio_to_midi
 from dsp2.graph_loader import GraphLoader
 
 
@@ -302,7 +302,7 @@ class PythonJsonE2ETest(unittest.TestCase):
             self.assertGreater(peak_powers[0], 0.0)
             self.assertGreater(peak_powers[1], 0.0)
 
-    def test_audio_to_midi_export_from_wav_path(self):
+    def test_audio_to_midi_export_from_wav_path_uses_public_api(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             wav_path = os.path.join(tmpdir, "two_sines.wav")
             midi_path = os.path.join(tmpdir, "two_sines.mid")
@@ -330,7 +330,6 @@ class PythonJsonE2ETest(unittest.TestCase):
                 midi_path,
                 block_size=block_size,
                 fft_size=block_size,
-                peak_count=2,
                 threshold=0.001,
                 min_bin_distance=2,
             )
@@ -339,6 +338,7 @@ class PythonJsonE2ETest(unittest.TestCase):
             self.assertEqual(result["block_count"], 1)
             self.assertIn(39, result["frames"][0])
             self.assertIn(55, result["frames"][0])
+            self.assertLessEqual(len(result["frames"][0]), 6)
 
             with open(midi_path, "rb") as midi_file:
                 payload = midi_file.read()
@@ -346,6 +346,67 @@ class PythonJsonE2ETest(unittest.TestCase):
             self.assertEqual(payload[0:4], b"MThd")
             self.assertIn(bytes([0x90, 39, 96]), payload)
             self.assertIn(bytes([0x90, 55, 96]), payload)
+
+    def test_audio_to_midi_collects_empty_frames_for_silence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "silence.wav")
+
+            sample_rate = 1024
+            block_size = 256
+            pcm_samples = [0] * (block_size * 2)
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            result = collect_midi_note_frames(
+                wav_path,
+                block_size=block_size,
+                fft_size=block_size,
+                peak_count=6,
+                threshold=0.001,
+            )
+
+            self.assertEqual(result["block_count"], 2)
+            self.assertEqual(result["frames"], [[], []])
+
+    def test_audio_to_midi_silence_writes_rest_only_midi(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "silence.wav")
+            midi_path = os.path.join(tmpdir, "silence.mid")
+
+            sample_rate = 1024
+            block_size = 256
+            pcm_samples = [0] * block_size
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            result = export_audio_to_midi(
+                wav_path,
+                midi_path,
+                block_size=block_size,
+                fft_size=block_size,
+                peak_count=6,
+                threshold=0.001,
+            )
+
+            self.assertEqual(result["frames"], [[]])
+            with open(midi_path, "rb") as midi_file:
+                payload = midi_file.read()
+
+            note_on_count = 0
+            for index in range(len(payload) - 2):
+                if payload[index] == 0x90 and payload[index + 2] > 0:
+                    note_on_count += 1
+
+            self.assertEqual(note_on_count, 0)
+            self.assertTrue(payload.endswith(b"\x00\xff\x2f\x00"))
 
 
 if __name__ == "__main__":
