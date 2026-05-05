@@ -41,4 +41,40 @@ namespace DSP2FastMath {
             return size; 
         }
     };
+
+    /**
+     * @brief Conversor de frequencia em Hz para nota MIDI inteira mais proxima.
+     *
+     * As fronteiras entre semitons sao calculadas na construcao, fora do ciclo
+     * critico. O lookup em tempo real usa apenas comparacoes deterministicas.
+     */
+    template <typename T>
+    class FrequencyToMidiNoteLUT {
+    private:
+        T boundaries[127];
+
+    public:
+        FrequencyToMidiNoteLUT() {
+            for (int note = 0; note < 127; ++note) {
+                const double boundary_note = static_cast<double>(note) + 0.5;
+                boundaries[note] = static_cast<T>(
+                    440.0 * std::pow(2.0, (boundary_note - 69.0) / 12.0)
+                );
+            }
+        }
+
+        inline T get_note(T frequency) const {
+            if (frequency <= static_cast<T>(0)) {
+                return static_cast<T>(0);
+            }
+
+            for (int note = 0; note < 127; ++note) {
+                if (frequency < boundaries[note]) {
+                    return static_cast<T>(note);
+                }
+            }
+
+            return static_cast<T>(127);
+        }
+    };
 }

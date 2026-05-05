@@ -241,6 +241,10 @@ class PythonJsonE2ETest(unittest.TestCase):
                                     "min_bin_distance": 2,
                                 },
                             },
+                            {
+                                "name": "Midi",
+                                "type": "FrequencyToMidiNote",
+                            },
                         ],
                         "edges": [
                             {
@@ -267,6 +271,12 @@ class PythonJsonE2ETest(unittest.TestCase):
                                 "dest": "Peaks",
                                 "dest_port": 1,
                             },
+                            {
+                                "source": "Peaks",
+                                "source_port": 0,
+                                "dest": "Midi",
+                                "dest_port": 0,
+                            },
                         ],
                     },
                     graph_file,
@@ -280,10 +290,14 @@ class PythonJsonE2ETest(unittest.TestCase):
 
             peak_frequencies = engine.get_node_output(node_ids["Peaks"], 0)
             peak_powers = engine.get_node_output(node_ids["Peaks"], 1)
+            midi_notes = engine.get_node_output(node_ids["Midi"], 0)
             self.assertEqual(len(peak_frequencies), 2)
             self.assertEqual(len(peak_powers), 2)
+            self.assertEqual(len(midi_notes), 2)
             self.assertIn(80.0, peak_frequencies)
             self.assertIn(200.0, peak_frequencies)
+            self.assertIn(39.0, midi_notes)
+            self.assertIn(55.0, midi_notes)
             self.assertGreater(peak_powers[0], 0.0)
             self.assertGreater(peak_powers[1], 0.0)
 

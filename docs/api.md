@@ -31,6 +31,12 @@ Funções trigonométricas e logarítmicas que trocam precisão absoluta por vel
 - **Configuração:** O tamanho padrão é definido pela constante `DSP2Config::SINE_LUT_DEFAULT_SIZE` em `core/constants.hpp`.
 - **Notas de Performance:** Implementação $O(1)$ sem chamadas de `std::sin` no loop. Utiliza `DSP2Config::PI` (calculado via `std::acos(-1)`) para a geração inicial da tabela.
 
+### `DSP2FastMath::FrequencyToMidiNoteLUT<T>`
+- **Assinatura:** `inline T get_note(T frequency) const`
+- **Descrição:** Converte frequência em Hz para a nota MIDI inteira mais próxima usando A4 = 440 Hz e MIDI 69.
+- **Configuração:** As fronteiras entre semitons são pré-calculadas na construção do objeto, fora do ciclo crítico.
+- **Notas de Performance:** O lookup em `process()` não chama `<cmath>`, não aloca memória e usa apenas comparações lineares contra 127 fronteiras fixas. Frequências `<= 0` retornam `0`; valores acima da faixa MIDI retornam `127`.
+
 ## 3. FFT e Análise Espectral
 
 Utilitários para transformar blocos de áudio real em espectros de frequência. Devem ser usados por nós de análise em vez de cada nó implementar uma FFT própria.
@@ -65,6 +71,14 @@ Utilitários para transformar blocos de áudio real em espectros de frequência.
 - **Formato:** As saídas têm tamanho fixo `peak_count`. Quando há menos picos disponíveis, o restante é preenchido com zero.
 - **Notas de Performance:** A seleção usa buffers internos pré-alocados e inserção ordenada top-N, sem `std::sort`, alocação dinâmica ou I/O dentro de `process()`.
 - **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker`.
+
+### Nó `FrequencyToMidiNote`
+- **Tipo de Factory:** `"FrequencyToMidiNote"`.
+- **Entradas:** Porta 0 recebe frequências em Hz, tipicamente a saída de frequências do `SpectralPeakPicker`.
+- **Saídas:** Porta 0 emite a nota MIDI inteira mais próxima em formato numérico `T`.
+- **Formato:** O tamanho e a taxa de amostragem da saída seguem a entrada. Frequências `<= 0` emitem `0`, preservando o padding por zero do `SpectralPeakPicker`; notas acima da faixa MIDI são limitadas a `127`.
+- **Notas de Performance:** Usa `DSP2FastMath::FrequencyToMidiNoteLUT<T>`; não há alocação dinâmica, I/O ou chamadas de `<cmath>` dentro de `process()`.
+- **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker -> FrequencyToMidiNote`.
 
 ## 4. Sistema de Logging (Zero-Cost / Lock-Free)
 

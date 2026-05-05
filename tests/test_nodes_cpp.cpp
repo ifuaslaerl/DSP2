@@ -15,6 +15,7 @@
 #include "../nodes_cpp/quadrature_modulator.hpp"
 #include "../nodes_cpp/spectrum_analyser.hpp"
 #include "../nodes_cpp/spectral_peak_picker.hpp"
+#include "../nodes_cpp/frequency_to_midi_note.hpp"
 #include "../nodes_cpp/windowing.hpp"
 
 namespace {
@@ -141,6 +142,37 @@ public:
 
 private:
     std::vector<double> powers_;
+    std::vector<double> frequencies_;
+};
+
+class FrequencyFrameSource final : public NodeBase<double> {
+public:
+    explicit FrequencyFrameSource(const std::vector<double>& frequencies)
+        : frequencies_(frequencies) {
+        output_buffers.resize(1, nullptr);
+        output_block_sizes.resize(1, 0);
+        output_sample_rates.resize(1, 0.0);
+    }
+
+    void compute_dimensions() override {
+        output_block_sizes[0] = static_cast<int>(frequencies_.size());
+    }
+
+    void prepare() override {
+        output_buffers[0] = new double[output_block_sizes[0]];
+    }
+
+    void process() override {
+        for (int i = 0; i < output_block_sizes[0]; ++i) {
+            output_buffers[0][i] = frequencies_[static_cast<size_t>(i)];
+        }
+    }
+
+    ~FrequencyFrameSource() override {
+        delete[] output_buffers[0];
+    }
+
+private:
     std::vector<double> frequencies_;
 };
 
@@ -647,6 +679,82 @@ bool test_spectral_peak_picker_min_bin_distance_replaces_weaker_neighbor() {
     return true;
 }
 
+bool test_frequency_to_midi_note_factory() {
+    Engine<double> engine;
+    const int node = engine.add_node("FrequencyToMidiNote");
+    return expect_true(node >= 0, "FrequencyToMidiNote node must be created by factory.");
+}
+
+bool test_frequency_to_midi_note_converts_known_frequencies() {
+    Graph<double> graph;
+    auto* source = new FrequencyFrameSource(
+        {0.0, 440.0, 880.0, 261.625565, 8.0, 20000.0}
+    );
+    auto* converter = new FrequencyToMidiNote<double>();
+
+    graph.add_node(source);
+    graph.add_node(converter);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    if (!expect_true(graph.get_node_output_size(1, 0) == 6,
+                     "FrequencyToMidiNote output must match input size.")) {
+        return false;
+    }
+
+    if (!expect_true(nearly_equal(graph.get_node_output_sample_rate(1, 0), 44100.0),
+                     "FrequencyToMidiNote output sample rate must follow input.")) {
+        return false;
+    }
+
+    const double* notes = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(notes != nullptr, "FrequencyToMidiNote output must be readable.")) {
+        return false;
+    }
+
+    const double expected_notes[6] = {0.0, 69.0, 81.0, 60.0, 0.0, 127.0};
+    for (int i = 0; i < 6; ++i) {
+        if (!nearly_equal(notes[i], expected_notes[i])) {
+            std::cout << "FAIL: FrequencyToMidiNote sample " << i << " expected "
+                      << expected_notes[i] << ", got " << notes[i] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_frequency_to_midi_note_rounds_nearest_note() {
+    Graph<double> graph;
+    auto* source = new FrequencyFrameSource(
+        {452.0, 466.1637615, 480.0}
+    );
+    auto* converter = new FrequencyToMidiNote<double>();
+
+    graph.add_node(source);
+    graph.add_node(converter);
+    graph.add_edge(0, 0, 1, 0);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    const double* notes = graph.get_node_output_buffer(1, 0);
+    if (!expect_true(notes != nullptr, "FrequencyToMidiNote rounded output must be readable.")) {
+        return false;
+    }
+
+    const double expected_notes[3] = {69.0, 70.0, 71.0};
+    for (int i = 0; i < 3; ++i) {
+        if (!nearly_equal(notes[i], expected_notes[i])) {
+            std::cout << "FAIL: FrequencyToMidiNote rounded sample " << i << " expected "
+                      << expected_notes[i] << ", got " << notes[i] << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool test_decimator_node() {
     Graph<double> graph;
     auto* source = new SequenceSource();
@@ -1076,6 +1184,9 @@ int main() {
     if (!test_spectral_peak_picker_selects_strongest_local_peaks()) return 1;
     if (!test_spectral_peak_picker_filters_and_pads()) return 1;
     if (!test_spectral_peak_picker_min_bin_distance_replaces_weaker_neighbor()) return 1;
+    if (!test_frequency_to_midi_note_factory()) return 1;
+    if (!test_frequency_to_midi_note_converts_known_frequencies()) return 1;
+    if (!test_frequency_to_midi_note_rounds_nearest_note()) return 1;
     if (!test_decimator_node()) return 1;
     if (!test_decimator_factor_four()) return 1;
     if (!test_windowing_node()) return 1;
