@@ -14,6 +14,7 @@
 #include "../nodes_cpp/convolution.hpp"
 #include "../nodes_cpp/quadrature_modulator.hpp"
 #include "../nodes_cpp/spectrum_analyser.hpp"
+#include "../nodes_cpp/spectral_peak_picker.hpp"
 
 // ==========================================
 // Função Global de Registro de Nós
@@ -37,6 +38,7 @@ void register_core_nodes() {
     NodeFactory<double>::get_instance().register_node("QuadratureModulator", [](){ return new QuadratureModulator<double>(); });
     NodeFactory<double>::get_instance().register_node("SpectrumAnalyser", [](){ return new SpectrumAnalyser<double>(); });
     NodeFactory<double>::get_instance().register_node("SpectrumAnalyzer", [](){ return new SpectrumAnalyser<double>(); });
+    NodeFactory<double>::get_instance().register_node("SpectralPeakPicker", [](){ return new SpectralPeakPicker<double>(); });
 }
 
 // ==========================================

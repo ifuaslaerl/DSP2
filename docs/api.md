@@ -56,6 +56,16 @@ Utilitários para transformar blocos de áudio real em espectros de frequência.
 - **Formato:** Espectro one-sided com `fft_size / 2 + 1` bins, de DC até Nyquist.
 - **Notas de Performance:** A saída usa potência (`real² + imag²`) normalizada por `fft_size²`, evitando `std::sqrt` dentro de `process()`.
 
+### Nó `SpectralPeakPicker`
+- **Tipo de Factory:** `"SpectralPeakPicker"`.
+- **Entradas:** Porta 0 recebe potência por bin; porta 1 recebe frequência em Hz por bin. Uso esperado após `SpectrumAnalyser`.
+- **Saídas:** Porta 0 emite as frequências selecionadas em Hz; porta 1 emite as potências correspondentes.
+- **Parâmetros:** `peak_count` (default `6`), `min_frequency` (default `20.0`), `max_frequency` (default `0`, sem limite), `threshold` (default `0.0`) e `min_bin_distance` (default `1`).
+- **Critério de Pico:** Um candidato deve estar dentro da faixa de frequência, acima do threshold e ser máximo local (`power[i] > power[i - 1]` e `power[i] > power[i + 1]`). Os candidatos são retornados em ordem decrescente de potência.
+- **Formato:** As saídas têm tamanho fixo `peak_count`. Quando há menos picos disponíveis, o restante é preenchido com zero.
+- **Notas de Performance:** A seleção usa buffers internos pré-alocados e inserção ordenada top-N, sem `std::sort`, alocação dinâmica ou I/O dentro de `process()`.
+- **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker`.
+
 ## 4. Sistema de Logging (Zero-Cost / Lock-Free)
 
 Para enviar avisos ou capturar exceções matemáticas em tempo real para a interface Python sem causar gargalos na thread, utilize as macros do Core Logger. Elas usam um SPSC Ring Buffer sob o capô, garantindo segurança lock-free de O(1).

@@ -14,6 +14,7 @@
 #include "../nodes_cpp/noise_generator.hpp"
 #include "../nodes_cpp/quadrature_modulator.hpp"
 #include "../nodes_cpp/spectrum_analyser.hpp"
+#include "../nodes_cpp/spectral_peak_picker.hpp"
 #include "../nodes_cpp/windowing.hpp"
 
 namespace {
@@ -103,6 +104,44 @@ public:
 
 private:
     double value_;
+};
+
+class SpectrumFrameSource final : public NodeBase<double> {
+public:
+    SpectrumFrameSource(const std::vector<double>& powers, const std::vector<double>& frequencies)
+        : powers_(powers), frequencies_(frequencies) {
+        output_buffers.resize(2, nullptr);
+        output_block_sizes.resize(2, 0);
+        output_sample_rates.resize(2, 0.0);
+    }
+
+    void compute_dimensions() override {
+        output_block_sizes[0] = static_cast<int>(powers_.size());
+        output_block_sizes[1] = static_cast<int>(frequencies_.size());
+    }
+
+    void prepare() override {
+        output_buffers[0] = new double[output_block_sizes[0]];
+        output_buffers[1] = new double[output_block_sizes[1]];
+    }
+
+    void process() override {
+        for (int i = 0; i < output_block_sizes[0]; ++i) {
+            output_buffers[0][i] = powers_[static_cast<size_t>(i)];
+        }
+        for (int i = 0; i < output_block_sizes[1]; ++i) {
+            output_buffers[1][i] = frequencies_[static_cast<size_t>(i)];
+        }
+    }
+
+    ~SpectrumFrameSource() override {
+        delete[] output_buffers[0];
+        delete[] output_buffers[1];
+    }
+
+private:
+    std::vector<double> powers_;
+    std::vector<double> frequencies_;
 };
 
 bool test_constant_node() {
@@ -482,6 +521,130 @@ bool test_spectrum_analyser_detects_aligned_sine_bin() {
     }
 
     return expect_true(power[3] > 0.20, "Spectrum aligned sine bin must carry strong power.");
+}
+
+bool test_spectral_peak_picker_selects_strongest_local_peaks() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 1.0, 5.0, 1.0, 0.0, 2.0, 8.0, 2.0, 0.0, 7.0, 1.0},
+        {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0}
+    );
+    auto* picker = new SpectralPeakPicker<double>();
+
+    graph.add_node(source);
+    graph.add_node(picker);
+    graph.set_node_parameter(1, "peak_count", 3.0);
+    graph.set_node_parameter(1, "min_frequency", 0.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    if (!expect_true(graph.get_node_output_size(1, 0) == 3 &&
+                     graph.get_node_output_size(1, 1) == 3,
+                     "SpectralPeakPicker outputs must match peak_count.")) {
+        return false;
+    }
+
+    const double* frequencies = graph.get_node_output_buffer(1, 0);
+    const double* powers = graph.get_node_output_buffer(1, 1);
+    if (!expect_true(frequencies != nullptr && powers != nullptr,
+                     "SpectralPeakPicker outputs must be readable.")) {
+        return false;
+    }
+
+    const double expected_frequencies[3] = {60.0, 90.0, 20.0};
+    const double expected_powers[3] = {8.0, 7.0, 5.0};
+    for (int i = 0; i < 3; ++i) {
+        if (!nearly_equal(frequencies[i], expected_frequencies[i]) ||
+            !nearly_equal(powers[i], expected_powers[i])) {
+            std::cout << "FAIL: SpectralPeakPicker peak " << i << " expected ("
+                      << expected_frequencies[i] << ", " << expected_powers[i]
+                      << "), got (" << frequencies[i] << ", " << powers[i] << ").\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_spectral_peak_picker_filters_and_pads() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 9.0, 1.0, 8.0, 1.0, 7.0, 1.0},
+        {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0}
+    );
+    auto* picker = new SpectralPeakPicker<double>();
+
+    graph.add_node(source);
+    graph.add_node(picker);
+    graph.set_node_parameter(1, "peak_count", 3.0);
+    graph.set_node_parameter(1, "min_frequency", 20.0);
+    graph.set_node_parameter(1, "max_frequency", 40.0);
+    graph.set_node_parameter(1, "threshold", 5.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    const double* frequencies = graph.get_node_output_buffer(1, 0);
+    const double* powers = graph.get_node_output_buffer(1, 1);
+    if (!expect_true(frequencies != nullptr && powers != nullptr,
+                     "SpectralPeakPicker filtered outputs must be readable.")) {
+        return false;
+    }
+
+    if (!nearly_equal(frequencies[0], 30.0) || !nearly_equal(powers[0], 8.0)) {
+        std::cout << "FAIL: SpectralPeakPicker filter expected first peak (30, 8), got ("
+                  << frequencies[0] << ", " << powers[0] << ").\n";
+        return false;
+    }
+
+    for (int i = 1; i < 3; ++i) {
+        if (!nearly_equal(frequencies[i], 0.0) || !nearly_equal(powers[i], 0.0)) {
+            std::cout << "FAIL: SpectralPeakPicker filter expected zero padding at " << i
+                      << ", got (" << frequencies[i] << ", " << powers[i] << ").\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool test_spectral_peak_picker_min_bin_distance_replaces_weaker_neighbor() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 1.0, 0.0, 1.0, 5.0, 1.0, 8.0, 1.0, 0.0, 1.0, 4.0, 1.0},
+        {0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 110.0}
+    );
+    auto* picker = new SpectralPeakPicker<double>();
+
+    graph.add_node(source);
+    graph.add_node(picker);
+    graph.set_node_parameter(1, "peak_count", 2.0);
+    graph.set_node_parameter(1, "min_frequency", 0.0);
+    graph.set_node_parameter(1, "min_bin_distance", 2.0);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    const double* frequencies = graph.get_node_output_buffer(1, 0);
+    const double* powers = graph.get_node_output_buffer(1, 1);
+    if (!expect_true(frequencies != nullptr && powers != nullptr,
+                     "SpectralPeakPicker distance outputs must be readable.")) {
+        return false;
+    }
+
+    if (!nearly_equal(frequencies[0], 60.0) || !nearly_equal(powers[0], 8.0) ||
+        !nearly_equal(frequencies[1], 100.0) || !nearly_equal(powers[1], 4.0)) {
+        std::cout << "FAIL: SpectralPeakPicker distance expected (60, 8), (100, 4), got ("
+                  << frequencies[0] << ", " << powers[0] << "), ("
+                  << frequencies[1] << ", " << powers[1] << ").\n";
+        return false;
+    }
+
+    return true;
 }
 
 bool test_decimator_node() {
@@ -910,6 +1073,9 @@ int main() {
     if (!test_real_fft_plan_impulse_response()) return 1;
     if (!test_spectrum_analyser_dimensions_and_frequencies()) return 1;
     if (!test_spectrum_analyser_detects_aligned_sine_bin()) return 1;
+    if (!test_spectral_peak_picker_selects_strongest_local_peaks()) return 1;
+    if (!test_spectral_peak_picker_filters_and_pads()) return 1;
+    if (!test_spectral_peak_picker_min_bin_distance_replaces_weaker_neighbor()) return 1;
     if (!test_decimator_node()) return 1;
     if (!test_decimator_factor_four()) return 1;
     if (!test_windowing_node()) return 1;

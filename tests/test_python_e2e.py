@@ -189,6 +189,104 @@ class PythonJsonE2ETest(unittest.TestCase):
             self.assertAlmostEqual(frequencies[3], 3.0, places=9)
             self.assertEqual(max(range(len(power)), key=lambda index: power[index]), 3)
 
+    def test_spectral_peak_picker_graph_from_wav_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "two_sines.wav")
+            graph_path = os.path.join(tmpdir, "graph.json")
+
+            sample_rate = 1024
+            block_size = 256
+            first_freq = 80.0
+            second_freq = 200.0
+            pcm_samples = []
+            for i in range(block_size):
+                value = (
+                    math.sin(2.0 * math.pi * first_freq * i / sample_rate)
+                    + 0.7 * math.sin(2.0 * math.pi * second_freq * i / sample_rate)
+                )
+                pcm_samples.append(int(round((value / 1.7) * 30000.0)))
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            with open(graph_path, "w", encoding="utf-8") as graph_file:
+                json.dump(
+                    {
+                        "nodes": [
+                            {
+                                "name": "Audio",
+                                "type": "AudioFileInput",
+                                "parameters": {"path": "two_sines.wav"},
+                            },
+                            {
+                                "name": "Window",
+                                "type": "Windowing",
+                                "parameters": {"type": 0},
+                            },
+                            {
+                                "name": "Spectrum",
+                                "type": "SpectrumAnalyzer",
+                                "parameters": {"fft_size": block_size},
+                            },
+                            {
+                                "name": "Peaks",
+                                "type": "SpectralPeakPicker",
+                                "parameters": {
+                                    "peak_count": 2,
+                                    "min_frequency": 20.0,
+                                    "threshold": 0.001,
+                                    "min_bin_distance": 2,
+                                },
+                            },
+                        ],
+                        "edges": [
+                            {
+                                "source": "Audio",
+                                "source_port": 0,
+                                "dest": "Window",
+                                "dest_port": 0,
+                            },
+                            {
+                                "source": "Window",
+                                "source_port": 0,
+                                "dest": "Spectrum",
+                                "dest_port": 0,
+                            },
+                            {
+                                "source": "Spectrum",
+                                "source_port": 0,
+                                "dest": "Peaks",
+                                "dest_port": 0,
+                            },
+                            {
+                                "source": "Spectrum",
+                                "source_port": 1,
+                                "dest": "Peaks",
+                                "dest_port": 1,
+                            },
+                        ],
+                    },
+                    graph_file,
+                )
+
+            engine = core.Engine()
+            engine.set_signal_parameters(float(sample_rate), block_size)
+            node_ids = GraphLoader.load_from_json(engine, graph_path)
+            engine.prepare_engine()
+            engine.process_block()
+
+            peak_frequencies = engine.get_node_output(node_ids["Peaks"], 0)
+            peak_powers = engine.get_node_output(node_ids["Peaks"], 1)
+            self.assertEqual(len(peak_frequencies), 2)
+            self.assertEqual(len(peak_powers), 2)
+            self.assertIn(80.0, peak_frequencies)
+            self.assertIn(200.0, peak_frequencies)
+            self.assertGreater(peak_powers[0], 0.0)
+            self.assertGreater(peak_powers[1], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
