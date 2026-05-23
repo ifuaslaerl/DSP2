@@ -39,7 +39,7 @@ Funções trigonométricas e logarítmicas que trocam precisão absoluta por vel
 
 ## 3. FFT e Análise Espectral
 
-Utilitários para transformar blocos de áudio real em espectros de frequência. Devem ser usados por nós de análise em vez de cada nó implementar uma FFT própria.
+Utilitários para transformar blocos de sinais reais no domínio do tempo em espectros de frequência. Devem ser usados por nós de análise em vez de cada nó implementar uma FFT própria.
 
 ### `DSP2FFT::is_power_of_two(int value) -> bool`
 - **Descrição:** Retorna se o tamanho informado é uma potência de 2 válida para a FFT radix-2.
@@ -56,7 +56,7 @@ Utilitários para transformar blocos de áudio real em espectros de frequência.
 
 ### Nó `SpectrumAnalyser`
 - **Tipo de Factory:** `"SpectrumAnalyser"` e alias `"SpectrumAnalyzer"`.
-- **Entradas:** Porta 0 recebe áudio real no domínio do tempo, preferencialmente já passado pelo nó `Windowing`.
+- **Entradas:** Porta 0 recebe o sinal real no domínio do tempo, preferencialmente já passado pelo nó `Windowing`.
 - **Saídas:** Porta 0 emite potência espectral por bin; porta 1 emite a frequência em Hz correspondente a cada bin.
 - **Parâmetros:** `fft_size` opcional. Se ausente ou menor que o bloco de entrada, o nó usa o próximo power-of-two maior ou igual ao bloco de entrada. Se maior que o bloco, aplica zero-padding.
 - **Formato:** Espectro one-sided com `fft_size / 2 + 1` bins, de DC até Nyquist.
@@ -70,7 +70,7 @@ Utilitários para transformar blocos de áudio real em espectros de frequência.
 - **Critério de Pico:** Um candidato deve estar dentro da faixa de frequência, acima do threshold e ser máximo local (`power[i] > power[i - 1]` e `power[i] > power[i + 1]`). Os candidatos são retornados em ordem decrescente de potência.
 - **Formato:** As saídas têm tamanho fixo `peak_count`. Quando há menos picos disponíveis, o restante é preenchido com zero.
 - **Notas de Performance:** A seleção usa buffers internos pré-alocados e inserção ordenada top-N, sem `std::sort`, alocação dinâmica ou I/O dentro de `process()`.
-- **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker`.
+- **Exemplo de Grafo:** `FileSignalInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker`.
 
 ### Nó `HarmonicPitchDetector`
 - **Tipo de Factory:** `"HarmonicPitchDetector"`.
@@ -80,7 +80,7 @@ Utilitários para transformar blocos de áudio real em espectros de frequência.
 - **Critério de Pitch:** Cada nota MIDI candidata dentro da faixa configurada é convertida para frequência fundamental e pontuada pela energia encontrada nos harmônicos esperados. Harmônicos mais altos recebem pesos decrescentes `1 / harmonic_index`; bins abaixo do limiar relativo ao maior pico do bloco são ignorados. A melhor fundamental só é emitida se a confiança ultrapassar `min_confidence`; silêncio ou baixa confiança retornam frequência `0`.
 - **Formato:** As saídas têm tamanho fixo `1`, produzindo uma nota monofônica por bloco de análise.
 - **Notas de Performance:** As frequências candidatas e pesos harmônicos são pré-calculados em `prepare()`. O `process()` não aloca memória, não faz I/O e não chama `<cmath>`; ele percorre candidatos, harmônicos e bins com loops simples.
-- **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> HarmonicPitchDetector -> FrequencyToMidiNote`.
+- **Exemplo de Grafo:** `FileSignalInput -> Windowing -> SpectrumAnalyser -> HarmonicPitchDetector -> FrequencyToMidiNote`.
 
 ### Nó `FrequencyToMidiNote`
 - **Tipo de Factory:** `"FrequencyToMidiNote"`.
@@ -88,7 +88,7 @@ Utilitários para transformar blocos de áudio real em espectros de frequência.
 - **Saídas:** Porta 0 emite a nota MIDI inteira mais próxima em formato numérico `T`.
 - **Formato:** O tamanho e a taxa de amostragem da saída seguem a entrada. Frequências `<= 0` emitem `0`, preservando o padding por zero do `SpectralPeakPicker`; notas acima da faixa MIDI são limitadas a `127`.
 - **Notas de Performance:** Usa `DSP2FastMath::FrequencyToMidiNoteLUT<T>`; não há alocação dinâmica, I/O ou chamadas de `<cmath>` dentro de `process()`.
-- **Exemplo de Grafo:** `AudioFileInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker -> FrequencyToMidiNote`.
+- **Exemplo de Grafo:** `FileSignalInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker -> FrequencyToMidiNote`.
 
 ## 4. Sistema de Logging (Zero-Cost / Lock-Free)
 

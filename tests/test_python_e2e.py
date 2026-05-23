@@ -7,7 +7,7 @@ import unittest
 import wave
 
 import dsp2._dsp2_core as core
-from dsp2.audio_to_midi import collect_midi_note_frames, export_audio_to_midi
+from examples.audio_to_midi.app import collect_midi_note_frames, export_audio_to_midi
 from dsp2.graph_loader import GraphLoader
 
 
@@ -118,7 +118,7 @@ class PythonJsonE2ETest(unittest.TestCase):
                         "nodes": [
                             {
                                 "name": "Audio",
-                                "type": "AudioFileInput",
+                                "type": "FileSignalInput",
                                 "parameters": {"path": "input.wav"},
                             },
                             {
@@ -174,7 +174,7 @@ class PythonJsonE2ETest(unittest.TestCase):
                         "nodes": [
                             {
                                 "name": "Audio",
-                                "type": "AudioFileInput",
+                                "type": "FileSignalInput",
                                 "parameters": {"path": "sine.wav"},
                             },
                             {
@@ -238,7 +238,7 @@ class PythonJsonE2ETest(unittest.TestCase):
                         "nodes": [
                             {
                                 "name": "Audio",
-                                "type": "AudioFileInput",
+                                "type": "FileSignalInput",
                                 "parameters": {"path": "two_sines.wav"},
                             },
                             {

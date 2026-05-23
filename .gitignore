@@ -80,12 +80,12 @@ coverage.xml
 dev_panel/outputs/
 dev_panel/plots/
 
-# Ignorar formatos de áudio, dados e MIDI em qualquer diretório
-*.wav
+# Ignorar matrizes de dados (PCM/WAV, CSV, DAT) e protocolos de controle (MIDI) em qualquer diretório*.wav
 *.csv
 *.dat
 *.log
 *.mid
+*.wav
 
 # Ignorar gráficos e relatórios gerados soltos no dev_panel
 dev_panel/*.png

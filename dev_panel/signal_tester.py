@@ -398,7 +398,8 @@ class DSP2TestHarness:
 def main():
     parser = argparse.ArgumentParser(description="Test Harness Robusto para o D(SP)^2")
     parser.add_argument("-g", "--graph", type=str, required=True, help="Caminho para o ficheiro JSON do grafo")
-    parser.add_argument("-o", "--output", type=str, default="dev_panel/outputs/test_output.png", help="Caminho de destino do grafico (ex: result.png)")    parser.add_argument("-b", "--blocks", type=int, default=1, help="Numero de blocos de audio a processar")
+    parser.add_argument("-o", "--output", type=str, default="dev_panel/outputs/test_output.png", help="Caminho de destino do grafico (ex: result.png)")    
+    parser.add_argument("-b", "--blocks", type=int, default=1, help="Numero de blocos de audio a processar")
     parser.add_argument("-sr", "--samplerate", type=float, default=DEFAULT_SAMPLE_RATE, help="Taxa de Amostragem (Sample Rate)")
     parser.add_argument("-bs", "--blocksize", type=int, default=DEFAULT_BLOCK_SIZE, help="Tamanho do Bloco (Block Size)")
     parser.add_argument("--report", type=str, default=None, help="Caminho de destino do relatorio Markdown")

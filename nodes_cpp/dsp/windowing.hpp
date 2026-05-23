@@ -1,7 +1,7 @@
 #pragma once
-#include "../core/node_base.hpp"
-#include "../core/node_factory.hpp"
-#include "../core/buffer_ops.hpp"
+#include "../../core/node_base.hpp"
+#include "../../core/node_factory.hpp"
+#include "../../core/buffer_ops.hpp"
 #include <cmath> // Permitido apenas no prepare()
 
 /**

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../core/buffer_ops.hpp"
-#include "../core/node_base.hpp"
-#include "../core/node_factory.hpp"
+#include "../../core/buffer_ops.hpp"
+#include "../../core/node_base.hpp"
+#include "../../core/node_factory.hpp"
 
 /**
  * @class HarmonicPitchDetector

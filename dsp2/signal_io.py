@@ -29,8 +29,8 @@ def _decode_pcm_frames(raw_frames, sample_width):
     raise ValueError(f"WAV PCM com largura de amostra nao suportada: {sample_width} bytes.")
 
 
-def load_wav_mono(path):
-    """Carrega um WAV PCM e retorna amostras mono normalizadas e sample rate."""
+def load_pcm_timeseries_data(path):
+    """Carrega dados temporais de um arquivo PCM WAV e retorna o array e a taxa de amostragem."""
     with wave.open(path, "rb") as wav:
         channels = wav.getnchannels()
         sample_width = wav.getsampwidth()

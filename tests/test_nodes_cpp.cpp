@@ -6,18 +6,25 @@
 #include "../core/fft.hpp"
 #include "../core/graph.hpp"
 #include "../core/node_base.hpp"
-#include "../nodes_cpp/butterworth_filter.hpp"
-#include "../nodes_cpp/audio_file_input.hpp"
-#include "../nodes_cpp/convolution.hpp"
-#include "../nodes_cpp/decimator.hpp"
-#include "../nodes_cpp/math_nodes.hpp"
-#include "../nodes_cpp/noise_generator.hpp"
-#include "../nodes_cpp/quadrature_modulator.hpp"
-#include "../nodes_cpp/spectrum_analyser.hpp"
-#include "../nodes_cpp/spectral_peak_picker.hpp"
-#include "../nodes_cpp/harmonic_pitch_detector.hpp"
-#include "../nodes_cpp/frequency_to_midi_note.hpp"
-#include "../nodes_cpp/windowing.hpp"
+
+// Vértices Matemáticos e Geradores
+#include "../nodes_cpp/math/math_nodes.hpp"
+#include "../nodes_cpp/generators/oscillator_nodes.hpp"
+#include "../nodes_cpp/generators/noise_generator.hpp"
+
+// Vértices genéricos de DSP
+#include "../nodes_cpp/dsp/file_signal_input.hpp"
+#include "../nodes_cpp/dsp/decimator.hpp"
+#include "../nodes_cpp/dsp/windowing.hpp"
+#include "../nodes_cpp/dsp/butterworth_filter.hpp"
+#include "../nodes_cpp/dsp/convolution.hpp"
+#include "../nodes_cpp/dsp/quadrature_modulator.hpp"
+#include "../nodes_cpp/dsp/spectrum_analyser.hpp"
+
+// Vértices de Exemplos (Áudio)
+#include "../nodes_cpp/examples_music_IR/spectral_peak_picker.hpp"
+#include "../nodes_cpp/examples_music_IR/harmonic_pitch_detector.hpp"
+#include "../nodes_cpp/examples_music_IR/frequency_to_midi_note.hpp"
 
 namespace {
 
@@ -414,8 +421,8 @@ bool test_noise_generator_different_seeds_diverge() {
 bool test_audio_file_input_node_streams_samples_and_pads_eof() {
     Engine<double> engine;
     engine.set_signal_parameters(44100.0, 4);
-    const int audio = engine.add_node("AudioFileInput");
-    if (!expect_true(audio >= 0, "AudioFileInput node must be created.")) return false;
+    const int audio = engine.add_node("FileSignalInput");
+    if (!expect_true(audio >= 0, "FileSignalInput node must be created.")) return false;
 
     engine.set_node_parameter_array(audio, "samples", {0.25, -0.5, 0.75, -1.0, 0.5});
     engine.prepare_engine();
@@ -423,14 +430,14 @@ bool test_audio_file_input_node_streams_samples_and_pads_eof() {
     engine.process_block();
     const std::vector<double> first = engine.get_node_output(audio, 0);
     if (!expect_true(static_cast<int>(first.size()) == 4,
-                     "AudioFileInput first block must preserve block size.")) {
+                     "FileSignalInput first block must preserve block size.")) {
         return false;
     }
 
     const double expected_first[4] = {0.25, -0.5, 0.75, -1.0};
     for (int i = 0; i < 4; ++i) {
         if (!nearly_equal(first[i], expected_first[i])) {
-            std::cout << "FAIL: AudioFileInput first block sample " << i
+            std::cout << "FAIL: FileSignalInput first block sample " << i
                       << " expected " << expected_first[i] << ", got " << first[i] << ".\n";
             return false;
         }
@@ -441,7 +448,7 @@ bool test_audio_file_input_node_streams_samples_and_pads_eof() {
     const double expected_second[4] = {0.5, 0.0, 0.0, 0.0};
     for (int i = 0; i < 4; ++i) {
         if (!nearly_equal(second[i], expected_second[i])) {
-            std::cout << "FAIL: AudioFileInput second block sample " << i
+            std::cout << "FAIL: FileSignalInput second block sample " << i
                       << " expected " << expected_second[i] << ", got " << second[i] << ".\n";
             return false;
         }
@@ -476,7 +483,7 @@ bool test_real_fft_plan_impulse_response() {
 bool test_spectrum_analyser_dimensions_and_frequencies() {
     Engine<double> engine;
     engine.set_signal_parameters(8000.0, 10);
-    const int audio = engine.add_node("AudioFileInput");
+    const int audio = engine.add_node("FileSignalInput");
     const int analyser = engine.add_node("SpectrumAnalyser");
     if (!expect_true(audio >= 0 && analyser >= 0,
                      "SpectrumAnalyser dimension test nodes must be created.")) {
@@ -517,7 +524,7 @@ bool test_spectrum_analyser_dimensions_and_frequencies() {
 bool test_spectrum_analyser_detects_aligned_sine_bin() {
     Engine<double> engine;
     engine.set_signal_parameters(16.0, 16);
-    const int audio = engine.add_node("AudioFileInput");
+    const int audio = engine.add_node("FileSignalInput");
     const int analyser = engine.add_node("SpectrumAnalyzer");
     if (!expect_true(audio >= 0 && analyser >= 0,
                      "SpectrumAnalyzer alias test nodes must be created.")) {

@@ -14,7 +14,7 @@
 * **3.3. Criação de Grafo Orientada a Dados:** Integrar um `NodeFactory`, permitindo a montagem de grafos complexos via arquivos **YAML/JSON** sem necessidade de alterar código ou recompilar.
 
 ### Fase 4: Implementação e Diversificação de Vértices (Módulos DSP)
-* **4.1. Vértices de Alta Performance (`nodes_cpp/`):** Escrever os vértices pesados (Filtros Biquad, Reverbs, FFT) em C++ puro, respeitando as proibições de alocação dinâmica e RTTI.
+* **4.1. Vértices de Alta Performance (`nodes_cpp/`):** Escrever os vértices pesados (Filtros Biquad, Convolução, FFT) em C++ puro, respeitando as proibições de alocação dinâmica e RTTI.
 * **4.2. Vértices de Prototipagem Rápida (`dsp2/nodes_py/`):** Desenvolver vértices em Python. Apesar de não serem tão performáticos quanto os de C++, são perfeitos para testar ideias de controlo, interfaces de IA e automações na simulação.
 * **4.3. Sistema de Probes (Tap Points):** Implementar nós de interceptação. Permite copiar dados intermediários do sinal para visualização sem violar a imutabilidade dos buffers Zero-Copy.
 

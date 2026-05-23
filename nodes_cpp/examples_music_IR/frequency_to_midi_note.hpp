@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../core/fast_math.hpp"
-#include "../core/node_base.hpp"
-#include "../core/node_factory.hpp"
+#include "../../core/fast_math.hpp"
+#include "../../core/node_base.hpp"
+#include "../../core/node_factory.hpp"
 
 /**
  * @class FrequencyToMidiNote

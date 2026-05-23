@@ -108,7 +108,7 @@ void Graph<T>::resolve_cyclic_graph() {
     // TODO (DISCUTIR POSTERIORMENTE):
     // Como os ciclos de processamento de sinal (feedback loops) serão tratados?
     // Exemplo de solução futura: Inserir automaticamente um nó de atraso (delay unitário z^-1)
-    // nas arestas de retorno para quebrar o ciclo topológico sem quebrar o áudio.
+    // nas arestas de retorno para quebrar o ciclo topológico sem causar descontinuidades no sinal temporal.
 }
 
 // ==========================================

@@ -30,7 +30,7 @@ class DSP2Orchestrator:
         self.engine.set_signal_parameters(DEFAULT_SAMPLE_RATE, DEFAULT_BLOCK_SIZE)
 
     def _poll_logs(self):
-        """Consome o Ring Buffer de logs C++ sem bloquear o loop de audio."""
+        """Consome o Ring Buffer de logs C++ sem bloquear o loop de processamento de sinal."""
         while self.is_running:
             logs = core.get_logs()
             for log in logs:

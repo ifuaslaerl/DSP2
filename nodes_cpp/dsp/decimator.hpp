@@ -1,6 +1,6 @@
 #pragma once
-#include "../core/node_base.hpp"
-#include "../core/node_factory.hpp"
+#include "../../core/node_base.hpp"
+#include "../../core/node_factory.hpp"
 
 template <typename T>
 class Decimator : public NodeBase<T> {

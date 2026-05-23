@@ -24,7 +24,6 @@ def midi_note_name(note):
     octave = (rounded // 12) - 1
     return f"{names[rounded % 12]}{octave}"
 
-
 def write_demo_wav(path, samples, sample_rate):
     pcm = np.round(np.clip(samples, -1.0, 1.0) * 30000.0).astype("<i2")
     with wave.open(path, "wb") as wav:
@@ -32,7 +31,6 @@ def write_demo_wav(path, samples, sample_rate):
         wav.setsampwidth(2)
         wav.setframerate(sample_rate)
         wav.writeframes(struct.pack("<" + "h" * len(pcm), *pcm.tolist()))
-
 
 def build_graph_json(path, wav_path, block_size):
     graph = {
@@ -77,7 +75,6 @@ def build_graph_json(path, wav_path, block_size):
     }
     with open(path, "w", encoding="utf-8") as graph_file:
         json.dump(graph, graph_file, indent=2)
-
 
 def run_demo(output_path):
     sample_rate = 1024
@@ -176,8 +173,7 @@ def run_demo(output_path):
     for frequency, note in zip(peak_frequencies, midi_notes):
         print(f"{frequency:.0f} Hz -> MIDI {int(round(note))} ({midi_note_name(note)})")
 
-
 if __name__ == "__main__":
-    default_output = os.path.join("dev_panel", "frequency_to_midi_demo.png")
+    default_output = os.path.join("dev_panel", "outputs", "frequency_to_midi_demo.png")
     output = sys.argv[1] if len(sys.argv) > 1 else default_output
     run_demo(output)

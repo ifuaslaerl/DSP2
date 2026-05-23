@@ -19,7 +19,7 @@ namespace DSP2Log {
 
     /**
      * @brief Logger SPSC (Single-Producer, Single-Consumer) Lock-Free.
-     * Seguro para uso em threads de áudio de tempo real.
+     * Seguro para uso em threads de processamento de tempo real.
      */
     class Logger {
     private:
@@ -38,7 +38,7 @@ namespace DSP2Log {
         }
 
         // ==========================================
-        // PRODUTOR (Chamado pela Thread de Áudio / C++)
+        // PRODUTOR (Chamado pela Thread de Processamento / C++)
         // ==========================================
         void push(Level level, const char* msg) {
             // memory_order_relaxed: Lê a nossa própria escrita sem sincronização pesada

@@ -5,7 +5,7 @@
 
 namespace DSP2FastMath {
     /**
-     * @brief Tabela de pesquisa (Lookup Table) para geração rápida de ondas senoide.
+     * @brief Tabela de pesquisa (Lookup Table) para geração rápida de sinais senoidais.
      */
     template <typename T>
     class SineLUT {
@@ -29,7 +29,7 @@ namespace DSP2FastMath {
 
         /**
          * @brief Obtém o valor da senoide sem cálculos trigonométricos.
-         * Utiliza inline para evitar overhead de chamada de função no loop de áudio.
+         * Utiliza inline para evitar overhead de chamada de função no loop de processamento.
          */
         inline T get_value(T phase_index) const {
             int index = static_cast<int>(phase_index) % size;

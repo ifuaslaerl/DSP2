@@ -244,7 +244,7 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        default="dev_panel/comparison_report.md",
+        default="dev_panel/outputs/comparison_report.md",
         help="Caminho de destino do relatorio Markdown",
     )
     parser.add_argument(

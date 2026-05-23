@@ -3,7 +3,7 @@ Constantes globais de configuracao para o ambiente Python do D(SP)^2.
 Devem refletir os padroes estabelecidos no core C++ (constants.hpp).
 """
 
-# Parametros Globais de Audio
+# Parametros Globais do Sinal
 DEFAULT_SAMPLE_RATE = 44100.0
 DEFAULT_BLOCK_SIZE = 256
 

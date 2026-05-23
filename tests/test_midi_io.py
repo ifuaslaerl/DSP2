@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from dsp2.midi_io import (
+from examples.audio_to_midi.midi_io import (
     build_midi_track,
     encode_variable_length_quantity,
     write_midi_file,

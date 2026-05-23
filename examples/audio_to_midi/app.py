@@ -2,13 +2,16 @@ import argparse
 import json
 import math
 import os
+import sys
 import tempfile
 
-import dsp2._dsp2_core as core
-from dsp2.audio_io import load_wav_mono
-from dsp2.graph_loader import GraphLoader
-from dsp2.midi_io import write_midi_file
+# Injeta a raiz do projeto no path para que o script possa importar o dsp2 de qualquer lugar
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+import dsp2._dsp2_core as core
+from dsp2.signal_io import load_pcm_timeseries_data
+from dsp2.graph_loader import GraphLoader
+from examples.audio_to_midi.midi_io import write_midi_file  # Import local do módulo que movemos junto
 
 def build_audio_to_midi_graph(
     path,
@@ -32,7 +35,7 @@ def build_audio_to_midi_graph(
     nodes = [
         {
             "name": "Audio",
-            "type": "AudioFileInput",
+            "type": "FileSignalInput",
             "parameters": {"path": input_path},
         },
         {
@@ -260,7 +263,7 @@ def collect_midi_note_frames(
         min_confidence,
     )
 
-    samples, sample_rate = load_wav_mono(input_path)
+    samples, sample_rate = load_pcm_timeseries_data(input_path)    
     block_count = max(1, int(math.ceil(len(samples) / float(block_size))))
 
     with tempfile.TemporaryDirectory() as tmpdir:

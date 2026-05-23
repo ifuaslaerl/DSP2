@@ -8,7 +8,7 @@ namespace DSP2Config {
     // Definição de Pi utilizando acos(-1) para máxima precisão do compilador
     inline const double PI = std::acos(-1.0);
 
-    // Parâmetros de Áudio Padrão
+    // Parâmetros de Sinal Padrão
     inline constexpr double DEFAULT_SAMPLE_RATE = 44100.0;
     inline constexpr int DEFAULT_BLOCK_SIZE = 256;
 

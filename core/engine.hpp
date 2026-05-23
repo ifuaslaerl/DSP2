@@ -39,12 +39,12 @@ public:
 
     /**
      * @brief Invoca a compilação do Grafo (ordenação topológica e prepare).
-     * Deve ser chamado ANTES de iniciar a thread de áudio.
+     * Deve ser chamado ANTES de iniciar a thread de processamento.
      */
     void prepare_engine();
 
     // ==========================================
-    // Callback de Áudio (Processamento de Bloco)
+    // Callback de Processamento de Sinal (Processamento de Bloco)
     // ==========================================
     
     /**

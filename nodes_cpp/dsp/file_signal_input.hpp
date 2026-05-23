@@ -1,6 +1,6 @@
 #pragma once
-#include "../core/node_base.hpp"
-#include "../core/node_factory.hpp"
+#include "../../core/node_base.hpp"
+#include "../../core/node_factory.hpp"
 
 /**
  * @class AudioFileInput
@@ -8,13 +8,13 @@
  * @note Entradas: nenhuma | Saidas: Porta 0
  */
 template <typename T>
-class AudioFileInput : public NodeBase<T> {
+class FileSignalInput : public NodeBase<T> {
 private:
     std::vector<T> samples;
     size_t read_position = 0;
 
 public:
-    AudioFileInput() {
+    FileSignalInput() {
         this->output_buffers.resize(1, nullptr);
         this->output_block_sizes.resize(1, 0);
         this->output_sample_rates.resize(1, 0.0);
@@ -53,7 +53,7 @@ public:
         }
     }
 
-    ~AudioFileInput() {
+    ~FileSignalInput() {
         delete[] this->output_buffers[0];
     }
 };

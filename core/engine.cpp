@@ -1,22 +1,24 @@
 #include "engine.hpp"
 #include "node_factory.hpp"
 
-// Headers antigos
-#include "../nodes_cpp/math_nodes.hpp"
-#include "../nodes_cpp/oscillator_nodes.hpp"
-#include "../nodes_cpp/noise_generator.hpp"
-#include "../nodes_cpp/audio_file_input.hpp"
+// Vértices Matemáticos e Geradores
+#include "../nodes_cpp/math/math_nodes.hpp"
+#include "../nodes_cpp/generators/oscillator_nodes.hpp"
+#include "../nodes_cpp/generators/noise_generator.hpp"
 
-// [NOVO] Headers dos Vértices Avançados
-#include "../nodes_cpp/decimator.hpp"
-#include "../nodes_cpp/windowing.hpp"
-#include "../nodes_cpp/butterworth_filter.hpp"
-#include "../nodes_cpp/convolution.hpp"
-#include "../nodes_cpp/quadrature_modulator.hpp"
-#include "../nodes_cpp/spectrum_analyser.hpp"
-#include "../nodes_cpp/spectral_peak_picker.hpp"
-#include "../nodes_cpp/harmonic_pitch_detector.hpp"
-#include "../nodes_cpp/frequency_to_midi_note.hpp"
+// Vértices de DSP (Processamento de Sinal Genérico)
+#include "../nodes_cpp/dsp/file_signal_input.hpp"
+#include "../nodes_cpp/dsp/decimator.hpp"
+#include "../nodes_cpp/dsp/windowing.hpp"
+#include "../nodes_cpp/dsp/butterworth_filter.hpp"
+#include "../nodes_cpp/dsp/convolution.hpp"
+#include "../nodes_cpp/dsp/quadrature_modulator.hpp"
+#include "../nodes_cpp/dsp/spectrum_analyser.hpp"
+
+// Vértices de Exemplos (Domínio de Áudio)
+#include "../nodes_cpp/examples_music_IR/spectral_peak_picker.hpp"
+#include "../nodes_cpp/examples_music_IR/harmonic_pitch_detector.hpp"
+#include "../nodes_cpp/examples_music_IR/frequency_to_midi_note.hpp"
 
 // ==========================================
 // Função Global de Registro de Nós
@@ -30,7 +32,7 @@ void register_core_nodes() {
     NodeFactory<double>::get_instance().register_node("Constant", [](){ return new ConstantNode<double>(); });
     NodeFactory<double>::get_instance().register_node("SineOscillator", [](){ return new SineOscillator<double>(); });
     NodeFactory<double>::get_instance().register_node("NoiseGenerator", [](){ return new NoiseGenerator<double>(); });
-    NodeFactory<double>::get_instance().register_node("AudioFileInput", [](){ return new AudioFileInput<double>(); });
+    NodeFactory<double>::get_instance().register_node("FileSignalInput", [](){ return new FileSignalInput<double>(); });
 
     // [NOVO] Nós Avançados (SDF, FIR, IIR, I/Q)
     NodeFactory<double>::get_instance().register_node("Decimator", [](){ return new Decimator<double>(); });
@@ -84,7 +86,7 @@ void Engine<T>::prepare_engine() {
 }
 
 // ==========================================
-// Callback de Áudio (Processamento de Bloco)
+// Callback de Processamento de Sinal (Processamento de Bloco)
 // ==========================================
 
 template <typename T>

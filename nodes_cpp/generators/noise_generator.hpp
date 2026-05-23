@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
-#include "../core/node_base.hpp"
-#include "../core/node_factory.hpp"
+#include "../../core/node_base.hpp"
+#include "../../core/node_factory.hpp"
 
 /**
  * @class NoiseGenerator

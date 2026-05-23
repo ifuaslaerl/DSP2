@@ -1,6 +1,8 @@
 # $D(SP)^2$ - Digital Signal Processing Simulation Program
 
-O **$D(SP)^2$** é um motor híbrido de processamento digital de sinais (DSP) baseado em grafos (Dataflow). Construído com foco absoluto em performance, ele permite prototipar algoritmos em Python (via arquivos JSON) e compilar a mesma lógica matematicamente rigorosa para sistemas embarcados (C++ puro).
+O **$D(SP)^2$** é um motor híbrido de processamento digital de sinais (DSP) de uso geral, baseado em grafos (Dataflow). Construído com foco absoluto em performance, ele permite prototipar algoritmos em Python (via arquivos JSON) e compilar a mesma lógica matematicamente rigorosa para sistemas embarcados (C++ puro).
+
+Sendo agnóstico a domínio, o motor é capaz de processar matrizes de dados temporais contínuos de qualquer área, como **telemetria, dados biomédicos (ECG/EEG), radiofrequência (SDR), acústica e sistemas financeiros**.
 
 ## Principais Features
 * **Zero-Copy Routing:** Passagem de buffers por referência, sem cópias na memória.
@@ -238,8 +240,7 @@ python3 dev_panel/signal_tester.py \
   --blocks 8
 ```
 
-Para ouvir a saída de um nó específico, exporte a porta desejada como WAV. O exemplo
-abaixo exporta a saída multirate do `Redutor_Multirate` em PCM 16-bit e Float 32-bit:
+Para exportar e inspecionar a saída de um nó específico como uma série temporal bruta, exporte a porta desejada como WAV.
 
 ```bash
 python3 dev_panel/signal_tester.py \
