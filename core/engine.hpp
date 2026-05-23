@@ -71,4 +71,7 @@ public:
     double get_node_output_sample_rate(int node_id, int port);
 
     int get_node_output_port_count(int node_id);
+
+    // Permite injetar um nó instanciado externamente (ex: do Python)
+    int add_node_ptr(NodeBase<T>* node);
 };

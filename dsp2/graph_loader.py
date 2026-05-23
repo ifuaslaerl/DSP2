@@ -3,6 +3,14 @@ import os
 import dsp2._dsp2_core as core
 from dsp2.signal_io import load_pcm_timeseries_data
 
+# [NOVO] Importamos os nós em Python
+from dsp2.nodes_py.debug_node import DebugNode
+
+# [NOVO] Dicionário de registro de nós disponíveis no lado Python
+PYTHON_NODES = {
+    "DebugNode": DebugNode
+}
+
 class GraphLoader:
     @staticmethod
     def load_from_json(engine: core.Engine, filepath: str):
@@ -11,21 +19,29 @@ class GraphLoader:
         with open(filepath, 'r') as f:
             data = json.load(f)
             
-        node_ids = {} # Dicionario (Nome Visual -> ID do C++)
+        node_ids = {} # Dicionário (Nome Visual -> ID do C++)
         
-        # 1. Instanciar Nos no Engine C++
+        # 1. Instanciar Nós no Engine C++
         for node in data.get('nodes', []):
             name = node['name']
             node_type = node['type']
             
-            node_id = engine.add_node(node_type)
-            if node_id == -1:
-                raise ValueError(f"Erro ao instanciar no '{name}'. O tipo '{node_type}' nao existe no core C++.")
-                
-            node_ids[name] = node_id
-            print(f" -> No alocado C++: {name} ({node_type}) | ID: {node_id}")
+            # [NOVO] Lógica de Instanciação Mista (Python vs C++)
+            if node_type in PYTHON_NODES:
+                # 1A: O nó foi escrito em Python
+                py_node = PYTHON_NODES[node_type]()
+                node_id = engine.add_node_obj(py_node)
+                print(f" -> Nó alocado PYTHON: {name} ({node_type}) | ID: {node_id}")
+            else:
+                # 1B: O nó é nativo e otimizado em C++
+                node_id = engine.add_node(node_type)
+                if node_id == -1:
+                    raise ValueError(f"Erro ao instanciar nó '{name}'. O tipo '{node_type}' não existe no core C++.")
+                print(f" -> Nó alocado C++: {name} ({node_type}) | ID: {node_id}")
             
-            # [NOVO] Leitura Inteligente de Parametros (Escalares vs Arrays)
+            node_ids[name] = node_id
+            
+            # Leitura Inteligente de Parâmetros (Mantido do original)
             if 'parameters' in node:
                 for param_name, value in node['parameters'].items():
                     if node_type == "FileSignalInput" and param_name == "path":
@@ -34,21 +50,17 @@ class GraphLoader:
                             wav_path = os.path.join(os.path.dirname(filepath), wav_path)
                         samples, sample_rate = load_pcm_timeseries_data(wav_path)
                         engine.set_node_parameter_array(node_id, "samples", samples)
-                        print(
-                            f"    - WAV carregado: {wav_path} "
-                            f"({len(samples)} amostras, {sample_rate} Hz)"
-                        )
+                        print(f"    - WAV carregado: {wav_path} ({len(samples)} amostras, {sample_rate} Hz)")
                         continue
+                        
                     if isinstance(value, list):
-                        # Se for uma lista no JSON, envia como Array para o C++
                         engine.set_node_parameter_array(node_id, param_name, value)
-                        print(f"    - Parametro Array configurado: {param_name} = (Tamanho: {len(value)})")
+                        print(f"    - Parâmetro Array configurado: {param_name} = (Tamanho: {len(value)})")
                     else:
-                        # Se for um numero unico, envia o double normal
                         engine.set_node_parameter(node_id, param_name, float(value))
-                        print(f"    - Parametro Escalar configurado: {param_name} = {value}")
+                        print(f"    - Parâmetro Escalar configurado: {param_name} = {value}")
 
-        # 2. Conectar as Arestas (Zero-Copy routing + Multirate SDF)
+        # 2. Conectar as Arestas (Mantido do original)
         for edge in data.get('edges', []):
             src = edge['source']
             src_port = edge['source_port']

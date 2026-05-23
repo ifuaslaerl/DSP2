@@ -239,7 +239,9 @@ void Graph<T>::process() {
 template <typename T>
 Graph<T>::~Graph() {
     for (auto* node : nodes) {
-        delete node;
+        if (!node->is_python_managed) {
+            delete node;
+        }
     }
 
     nodes.clear();

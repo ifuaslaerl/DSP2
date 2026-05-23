@@ -173,6 +173,17 @@ int Engine<T>::get_node_output_port_count(int node_id) {
     return 0;
 }
 
+template <typename T>
+int Engine<T>::add_node_ptr(NodeBase<T>* node) {
+    if (!node) {
+        DSP2_LOG_ERROR("Engine: Tentativa de injetar nó nulo via ponteiro.");
+        return -1;
+    }
+    node->is_python_managed = true;
+    graph->add_node(node);
+    return graph->get_node_count() - 1;
+}
+
 // ==========================================
 // Instanciação Explícita de Templates (Garante o linking)
 // ==========================================

@@ -1,0 +1,9 @@
+{
+    "nodes": [
+        { "name": "Oscilador", "type": "SineOscillator", "parameters": { "frequency": 440.0 } },
+        { "name": "Monitor", "type": "DebugNode", "parameters": { "log_level": 1.0 } }
+    ],
+    "edges": [
+        { "source": "Oscilador", "source_port": 0, "dest": "Monitor", "dest_port": 0 }
+    ]
+}

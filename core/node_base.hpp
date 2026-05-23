@@ -25,6 +25,7 @@ class NodeBase {
         std::vector<double> output_sample_rates;
 
     public:
+        bool is_python_managed = false; // Flag para impedir delete duplo
         virtual ~NodeBase() = default;
 
         /**
@@ -52,4 +53,14 @@ class NodeBase {
 
         // Abaixo do set_parameter atual
         virtual void set_parameter_array(const std::string& /* param_name */, const std::vector<double>& /* values */) {}
+
+        // [NOVO] Método para redimensionar os buffers a partir do Python
+        void setup_buffers(int num_inputs, int num_outputs) {
+            input_buffers.resize(num_inputs, nullptr);
+            output_buffers.resize(num_outputs, nullptr);
+            input_block_sizes.resize(num_inputs, 256); // 256 como default
+            output_block_sizes.resize(num_outputs, 256);
+            input_sample_rates.resize(num_inputs, 44100.0);
+            output_sample_rates.resize(num_outputs, 44100.0);
+        }
 };
