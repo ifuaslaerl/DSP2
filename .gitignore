@@ -74,15 +74,22 @@ coverage.xml
 .pytest_cache/
 
 # ==========================================
-# Hardware e Testes DSP2 Específico
+# Hardware e Testes DSP2 Especifico
 # ==========================================
-# Se vocês gerarem gráficos de teste ou áudios temporários no dev_panel
+# Ignorar as pastas de resultados completamente
 dev_panel/outputs/
 dev_panel/plots/
+
+# Ignorar formatos de áudio, dados e MIDI em qualquer diretório
 *.wav
 *.csv
 *.dat
 *.log
+*.mid
+
+# Ignorar gráficos e relatórios gerados soltos no dev_panel
+dev_panel/*.png
+dev_panel/*_report.md
 
 # ==========================================
 # IDEs e Sistema Operacional

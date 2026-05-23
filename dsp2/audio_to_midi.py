@@ -385,7 +385,7 @@ def export_audio_to_midi(
 def main():
     parser = argparse.ArgumentParser(description="Exporta um WAV para MIDI usando o pipeline DSP2.")
     parser.add_argument("--input", required=True, help="Arquivo WAV PCM de entrada.")
-    parser.add_argument("--output", required=True, help="Arquivo .mid de saida.")
+    parser.add_argument("--output", default="dev_panel/outputs/export.mid", help="Arquivo .mid de saida.")    
     parser.add_argument("--block-size", type=int, default=2048, help="Tamanho de bloco de analise.")
     parser.add_argument("--fft-size", type=int, default=None, help="Tamanho da FFT; default igual ao block-size.")
     parser.add_argument("--peak-count", type=int, default=6, help="Numero maximo de notas simultaneas por bloco.")

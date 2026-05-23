@@ -10,6 +10,5 @@ from dsp2.audio_to_midi import (  # noqa: E402,F401
     main,
 )
 
-
 if __name__ == "__main__":
     main()
