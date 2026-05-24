@@ -20,6 +20,7 @@
 #include "../nodes_cpp/dsp/convolution.hpp"
 #include "../nodes_cpp/dsp/quadrature_modulator.hpp"
 #include "../nodes_cpp/dsp/spectrum_analyser.hpp"
+#include "../nodes_cpp/utils/probe_node.hpp"
 
 // Vértices de Exemplos (Áudio)
 #include "../nodes_cpp/examples_music_IR/spectral_peak_picker.hpp"
@@ -1310,6 +1311,29 @@ bool test_quadrature_modulator_nonzero_frequency() {
     return true;
 }
 
+bool test_probe_node() {
+    Engine<double> engine;
+    engine.set_signal_parameters(44100.0, 8);
+    
+    // Instancia o gerador e o nosso novo nó de interceção
+    const int source = engine.add_node("Constant");
+    const int probe = engine.add_node("ProbeNode");
+    
+    if (!expect_true(source >= 0 && probe >= 0, "Probe test nodes must be created.")) {
+        return false;
+    }
+
+    // Configura o valor do gerador e liga-o ao ProbeNode
+    engine.set_node_parameter(source, "value", 3.14);
+    engine.add_edge(source, 0, probe, 0);
+    
+    engine.prepare_engine();
+    engine.process_block();
+
+    // Valida se o ProbeNode repassou corretamente os dados na sua Porta 0
+    return expect_block_value(engine.get_node_output(probe, 0), 8, 3.14);
+}
+
 }  // namespace
 
 int main() {
@@ -1351,6 +1375,7 @@ int main() {
     if (!test_butterworth_highpass_dc_decay()) return 1;
     if (!test_quadrature_modulator_node()) return 1;
     if (!test_quadrature_modulator_nonzero_frequency()) return 1;
+    if (!test_probe_node()) return 1;
 
     std::cout << "SUCCESS: nodes_cpp scenarios passed.\n";
     return 0;

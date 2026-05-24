@@ -90,6 +90,13 @@ Utilitários para transformar blocos de sinais reais no domínio do tempo em esp
 - **Notas de Performance:** Usa `DSP2FastMath::FrequencyToMidiNoteLUT<T>`; não há alocação dinâmica, I/O ou chamadas de `<cmath>` dentro de `process()`.
 - **Exemplo de Grafo:** `FileSignalInput -> Windowing -> SpectrumAnalyser -> SpectralPeakPicker -> FrequencyToMidiNote`.
 
+### Nó `ProbeNode`
+- **Tipo de Factory:** `"ProbeNode"`.
+- **Entradas:** Porta 0 recebe qualquer sinal contínuo ou discreto.
+- **Saídas:** Porta 0 emite uma cópia exata do sinal recebido.
+- **Descrição:** Nó de interceção transparente (*Tap Point*). Permite a extração de sinais em pontos intermédios do grafo para ferramentas de visualização e *debug* (como o painel PyQtGraph), sem violar a regra de imutabilidade de memória (*Zero-Copy*).
+- **Notas de Performance:** O processo de cópia em `process()` utiliza ponteiros `__restrict` e um loop simples, garantindo vetorização SIMD imediata. Sem alocação dinâmica no ciclo principal.
+
 ## 4. Sistema de Logging (Zero-Cost / Lock-Free)
 
 Para enviar avisos ou capturar exceções matemáticas em tempo real para a interface Python sem causar gargalos na thread, utilize as macros do Core Logger. Elas usam um SPSC Ring Buffer sob o capô, garantindo segurança lock-free de O(1).

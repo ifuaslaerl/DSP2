@@ -14,6 +14,7 @@
 #include "../nodes_cpp/dsp/convolution.hpp"
 #include "../nodes_cpp/dsp/quadrature_modulator.hpp"
 #include "../nodes_cpp/dsp/spectrum_analyser.hpp"
+#include "../nodes_cpp/utils/probe_node.hpp"
 
 // Vértices de Exemplos (Domínio de Áudio)
 #include "../nodes_cpp/examples_music_IR/spectral_peak_picker.hpp"
@@ -45,6 +46,7 @@ void register_core_nodes() {
     NodeFactory<double>::get_instance().register_node("SpectralPeakPicker", [](){ return new SpectralPeakPicker<double>(); });
     NodeFactory<double>::get_instance().register_node("HarmonicPitchDetector", [](){ return new HarmonicPitchDetector<double>(); });
     NodeFactory<double>::get_instance().register_node("FrequencyToMidiNote", [](){ return new FrequencyToMidiNote<double>(); });
+    NodeFactory<double>::get_instance().register_node("ProbeNode", [](){ return new ProbeNode<double>(); });
 }
 
 // ==========================================
