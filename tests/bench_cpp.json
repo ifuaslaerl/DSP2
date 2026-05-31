@@ -1,0 +1,9 @@
+{
+    "nodes": [
+        {"name": "Source", "type": "Constant", "parameters": {"value": 1.0}},
+        {"name": "ProcessTarget", "type": "Gain", "parameters": {"gain": 2.0}}
+    ],
+    "edges": [
+        {"source": "Source", "source_port": 0, "dest": "ProcessTarget", "dest_port": 0}
+    ]
+}
