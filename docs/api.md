@@ -41,6 +41,13 @@ Funções trigonométricas e logarítmicas que trocam precisão absoluta por vel
 
 Utilitários para transformar blocos de sinais reais no domínio do tempo em espectros de frequência. Devem ser usados por nós de análise em vez de cada nó implementar uma FFT própria.
 
+### Nó `FileSignalInput`
+- **Tipo de Factory:** `"FileSignalInput"`.
+- **Entradas:** Nenhuma. As amostras são carregadas na fase de setup pelo parâmetro-array `samples`.
+- **Saídas:** Porta 0 emite uma janela de áudio real com o tamanho de bloco configurado pelo motor.
+- **Parâmetros:** `hop_size` opcional. Quando ausente ou `<= 0`, avança um bloco completo após cada chamada. Quando menor que o bloco, emite janelas sobrepostas sem copiar ou realocar o vetor de origem.
+- **Notas de Performance:** O vetor de amostras e o buffer de saída são alocados fora do ciclo crítico. `process()` percorre a janela atual e avança apenas um índice interno; não aloca memória e não faz I/O.
+
 ### `DSP2FFT::is_power_of_two(int value) -> bool`
 - **Descrição:** Retorna se o tamanho informado é uma potência de 2 válida para a FFT radix-2.
 - **Notas de Performance:** Função inline, $O(1)$, sem alocação.
@@ -75,11 +82,11 @@ Utilitários para transformar blocos de sinais reais no domínio do tempo em esp
 ### Nó `HarmonicPitchDetector`
 - **Tipo de Factory:** `"HarmonicPitchDetector"`.
 - **Entradas:** Porta 0 recebe potência por bin; porta 1 recebe frequência em Hz por bin. Uso esperado após `SpectrumAnalyser`.
-- **Saídas:** Porta 0 emite a frequência fundamental estimada em Hz; porta 1 emite a confiança normalizada da estimativa no intervalo `0..1`.
-- **Parâmetros:** `min_midi_note` (default `36`), `max_midi_note` (default `84`), `harmonic_count` (default `6`), `relative_threshold` (default `0.05`) e `min_confidence` (default `0.2`).
+- **Saídas:** Porta 0 emite a melhor frequência fundamental estimada em Hz; porta 1 emite sua confiança normalizada no intervalo `0..1`; porta 2 emite as frequências candidatas para seleção temporal offline; porta 3 emite as respectivas saliências normalizadas.
+- **Parâmetros:** `min_midi_note` (default `36`), `max_midi_note` (default `84`), `harmonic_count` (default `6`), `relative_threshold` (default `0.05`), `min_confidence` (default `0.2`) e `path_candidate_count` (default `5`).
 - **Critério de Pitch:** Cada nota MIDI candidata dentro da faixa configurada é convertida para frequência fundamental e pontuada pela energia encontrada nos harmônicos esperados. Harmônicos mais altos recebem pesos decrescentes `1 / harmonic_index`; bins abaixo do limiar relativo ao maior pico do bloco são ignorados. A melhor fundamental só é emitida se a confiança ultrapassar `min_confidence`; silêncio ou baixa confiança retornam frequência `0`.
-- **Formato:** As saídas têm tamanho fixo `1`, produzindo uma nota monofônica por bloco de análise.
-- **Notas de Performance:** As frequências candidatas e pesos harmônicos são pré-calculados em `prepare()`. O `process()` não aloca memória, não faz I/O e não chama `<cmath>`; ele percorre candidatos, harmônicos e bins com loops simples.
+- **Formato:** As portas 0 e 1 têm tamanho fixo `1`. As portas 2 e 3 têm tamanho fixo `path_candidate_count` e usam zero para preencher posições sem candidato.
+- **Notas de Performance:** As frequências candidatas, pesos harmônicos e buffers top-N são pré-alocados em `prepare()`. O `process()` não aloca memória, não faz I/O e não chama `<cmath>`; a procura do bin mais próximo usa busca binária sobre as frequências ordenadas da FFT.
 - **Exemplo de Grafo:** `FileSignalInput -> Windowing -> SpectrumAnalyser -> HarmonicPitchDetector -> FrequencyToMidiNote`.
 
 ### Nó `FrequencyToMidiNote`

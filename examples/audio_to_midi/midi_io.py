@@ -34,17 +34,17 @@ def _clamp_int(value, minimum, maximum):
 
 
 def _normalise_frame(frame):
-    notes = set()
+    notes = []
     for note in frame:
         midi_note = _clamp_int(note, 0, 127)
-        if midi_note > 0:
-            notes.add(midi_note)
+        if midi_note > 0 and midi_note not in notes:
+            notes.append(midi_note)
     return notes
 
 
 def _normalise_motor_mode(motor_mode):
-    if motor_mode not in {"single", "unison", "round-robin"}:
-        raise ValueError("motor_mode deve ser 'single', 'unison' ou 'round-robin'.")
+    if motor_mode not in {"single", "unison", "round-robin", "voices"}:
+        raise ValueError("motor_mode deve ser 'single', 'unison', 'round-robin' ou 'voices'.")
     return motor_mode
 
 
@@ -103,25 +103,48 @@ def build_midi_track(
     next_round_robin = 0
     for frame_index, frame in enumerate(note_frames):
         current_tick = frame_index * frame_ticks
-        desired_note_values = _normalise_frame(frame)
-        desired_assignments = {}
+        if motor_mode == "voices":
+            desired_notes = set()
+            for voice_index, note in enumerate(frame[: len(channels)]):
+                midi_note = _clamp_int(note, 0, 127)
+                if midi_note > 0:
+                    desired_notes.add((channels[voice_index], midi_note))
+            desired_assignments = {}
+        else:
+            desired_note_values = _normalise_frame(frame)
+            desired_assignments = {}
 
-        for note in sorted(desired_note_values):
-            if motor_mode == "single":
-                desired_assignments[note] = (channels[0],)
-            elif motor_mode == "unison":
-                desired_assignments[note] = tuple(channels)
-            elif note in active_assignments:
-                desired_assignments[note] = active_assignments[note]
-            else:
-                desired_assignments[note] = (channels[next_round_robin],)
-                next_round_robin = (next_round_robin + 1) % len(channels)
+            if motor_mode == "single" and desired_note_values:
+                desired_assignments[desired_note_values[0]] = (channels[0],)
+            elif motor_mode == "unison" and desired_note_values:
+                desired_assignments[desired_note_values[0]] = tuple(channels)
+            elif motor_mode == "round-robin":
+                available_channels = set(channels)
 
-        desired_notes = {
-            (channel, note)
-            for note, assigned_channels in desired_assignments.items()
-            for channel in assigned_channels
-        }
+                for note in desired_note_values:
+                    if note not in active_assignments:
+                        continue
+                    channel = active_assignments[note][0]
+                    if channel in available_channels:
+                        desired_assignments[note] = (channel,)
+                        available_channels.remove(channel)
+
+                for note in desired_note_values:
+                    if note in desired_assignments or not available_channels:
+                        continue
+                    for _ in channels:
+                        channel = channels[next_round_robin]
+                        next_round_robin = (next_round_robin + 1) % len(channels)
+                        if channel in available_channels:
+                            desired_assignments[note] = (channel,)
+                            available_channels.remove(channel)
+                            break
+
+            desired_notes = {
+                (channel, note)
+                for note, assigned_channels in desired_assignments.items()
+                for channel in assigned_channels
+            }
 
         for channel, note in sorted(active_notes - desired_notes):
             _append_delta(track, current_tick - last_tick)

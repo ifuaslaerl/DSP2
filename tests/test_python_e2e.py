@@ -30,6 +30,22 @@ def extract_note_on_channels(midi_bytes):
     return channels
 
 
+def extract_note_on_channel_notes(midi_bytes):
+    events = []
+    index = 0
+    while index < len(midi_bytes):
+        status = midi_bytes[index]
+        if 0x90 <= status <= 0x9F and index + 2 < len(midi_bytes):
+            note = midi_bytes[index + 1]
+            velocity = midi_bytes[index + 2]
+            if velocity > 0:
+                events.append(((status & 0x0F) + 1, note))
+            index += 3
+        else:
+            index += 1
+    return events
+
+
 class PythonJsonE2ETest(unittest.TestCase):
     def write_graph(self, data):
         handle = tempfile.NamedTemporaryFile(
@@ -349,6 +365,7 @@ class PythonJsonE2ETest(unittest.TestCase):
                 midi_path,
                 block_size=block_size,
                 fft_size=block_size,
+                mode="peaks",
                 threshold=0.001,
                 min_bin_distance=2,
             )
@@ -364,7 +381,7 @@ class PythonJsonE2ETest(unittest.TestCase):
 
             self.assertEqual(payload[0:4], b"MThd")
             self.assertIn(bytes([0x90, 39, 96]), payload)
-            self.assertIn(bytes([0x90, 55, 96]), payload)
+            self.assertNotIn(bytes([0x90, 55, 96]), payload)
 
     def test_audio_to_midi_melody_mode_tracks_synthetic_melody(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -405,6 +422,95 @@ class PythonJsonE2ETest(unittest.TestCase):
             for note in melody_notes:
                 self.assertIn(note, detected_notes)
 
+    def test_audio_to_midi_defaults_to_melody_with_overlapping_hop(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "default.wav")
+            midi_path = os.path.join(tmpdir, "default.mid")
+
+            sample_rate = 8192
+            block_size = 1024
+            frequency = midi_note_to_frequency(60)
+            pcm_samples = [
+                int(round(math.sin(2.0 * math.pi * frequency * i / sample_rate) * 26000.0))
+                for i in range(block_size * 2)
+            ]
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            result = export_audio_to_midi(
+                wav_path,
+                midi_path,
+                block_size=block_size,
+                fft_size=block_size,
+                min_midi_note=48,
+                max_midi_note=72,
+                min_confidence=0.05,
+                min_note_frames=1,
+            )
+
+            self.assertEqual(result["mode"], "melody")
+            self.assertEqual(result["hop_size"], block_size // 4)
+            self.assertEqual(result["frame_ticks"], 30)
+
+    def test_audio_to_midi_melody_mode_tracks_mix_with_accompaniment(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "mix.wav")
+            midi_path = os.path.join(tmpdir, "mix.mid")
+
+            sample_rate = 8192
+            block_size = 1024
+            hop_size = 256
+            melody_notes = [60, 62, 64, 65]
+            pcm_samples = []
+            for note in melody_notes:
+                melody_frequency = midi_note_to_frequency(note)
+                for i in range(block_size * 2):
+                    absolute_index = len(pcm_samples)
+                    value = (
+                        0.75 * math.sin(2.0 * math.pi * melody_frequency * i / sample_rate)
+                        + 0.18 * math.sin(
+                            2.0 * math.pi * midi_note_to_frequency(48) * absolute_index / sample_rate
+                        )
+                        + 0.04 * math.sin(2.0 * math.pi * 913.0 * absolute_index / sample_rate)
+                    )
+                    pcm_samples.append(int(round((value / 0.97) * 28000.0)))
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            result = export_audio_to_midi(
+                wav_path,
+                midi_path,
+                block_size=block_size,
+                fft_size=block_size,
+                hop_size=hop_size,
+                mode="melody",
+                min_midi_note=48,
+                max_midi_note=72,
+                min_confidence=0.05,
+                min_note_frames=1,
+            )
+
+            detected_notes = [frame[0] if frame else 0 for frame in result["frames"]]
+            expected_notes = [
+                melody_notes[min(frame_index // 8, len(melody_notes) - 1)]
+                for frame_index in range(len(detected_notes))
+            ]
+            correct_frames = sum(
+                detected == expected for detected, expected in zip(detected_notes, expected_notes)
+            )
+
+            self.assertTrue(os.path.exists(midi_path))
+            self.assertGreaterEqual(correct_frames / len(expected_notes), 0.8)
+            for note in melody_notes:
+                self.assertIn(note, detected_notes)
+
     def test_audio_to_midi_motor_modes_are_exposed_by_export(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             wav_path = os.path.join(tmpdir, "melody.wav")
@@ -427,6 +533,7 @@ class PythonJsonE2ETest(unittest.TestCase):
 
             single_path = os.path.join(tmpdir, "single.mid")
             unison_path = os.path.join(tmpdir, "unison.mid")
+            limited_unison_path = os.path.join(tmpdir, "limited_unison.mid")
             round_robin_path = os.path.join(tmpdir, "round_robin.mid")
 
             common_kwargs = {
@@ -442,6 +549,13 @@ class PythonJsonE2ETest(unittest.TestCase):
             export_audio_to_midi(wav_path, unison_path, motor_mode="unison", **common_kwargs)
             export_audio_to_midi(
                 wav_path,
+                limited_unison_path,
+                motor_mode="unison",
+                motor_count=2,
+                **common_kwargs,
+            )
+            export_audio_to_midi(
+                wav_path,
                 round_robin_path,
                 motor_mode="round-robin",
                 **common_kwargs,
@@ -451,13 +565,66 @@ class PythonJsonE2ETest(unittest.TestCase):
                 single_channels = extract_note_on_channels(midi_file.read())
             with open(unison_path, "rb") as midi_file:
                 unison_channels = extract_note_on_channels(midi_file.read())
+            with open(limited_unison_path, "rb") as midi_file:
+                limited_unison_channels = extract_note_on_channels(midi_file.read())
             with open(round_robin_path, "rb") as midi_file:
                 round_robin_channels = extract_note_on_channels(midi_file.read())
 
             self.assertTrue(single_channels)
             self.assertEqual(set(single_channels), {1})
             self.assertTrue(set(range(1, 7)).issubset(set(unison_channels)))
+            self.assertEqual(set(limited_unison_channels), {1, 2})
             self.assertGreaterEqual(len(set(round_robin_channels)), 2)
+
+    def test_audio_to_midi_harmony_mode_writes_voice_channels(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wav_path = os.path.join(tmpdir, "harmony.wav")
+            midi_path = os.path.join(tmpdir, "harmony.mid")
+
+            sample_rate = 8192
+            block_size = 1024
+            melody_notes = [62, 65]
+            pcm_samples = []
+            for note in melody_notes:
+                frequency = midi_note_to_frequency(note)
+                for i in range(block_size * 2):
+                    value = math.sin(2.0 * math.pi * frequency * i / sample_rate)
+                    pcm_samples.append(int(round(value * 26000.0)))
+
+            with wave.open(wav_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes(struct.pack("<" + "h" * len(pcm_samples), *pcm_samples))
+
+            result = export_audio_to_midi(
+                wav_path,
+                midi_path,
+                block_size=block_size,
+                fft_size=block_size,
+                mode="harmony",
+                harmony_key="D",
+                harmony_scale="minor",
+                harmony_voices=6,
+                min_midi_note=36,
+                max_midi_note=84,
+                min_confidence=0.05,
+                min_note_frames=1,
+            )
+
+            self.assertTrue(os.path.exists(midi_path))
+            self.assertEqual(result["mode"], "harmony")
+            self.assertEqual(result["motor_mode"], "voices")
+            self.assertTrue(any(len(frame) > 1 for frame in result["frames"]))
+
+            with open(midi_path, "rb") as midi_file:
+                events = extract_note_on_channel_notes(midi_file.read())
+
+            event_channels = {channel for channel, _ in events}
+            self.assertTrue(set(range(1, 7)).issubset(event_channels))
+            channel_one_notes = [note for channel, note in events if channel == 1]
+            for note in melody_notes:
+                self.assertIn(note, channel_one_notes)
 
     def test_audio_to_midi_collects_empty_frames_for_silence(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -477,6 +644,7 @@ class PythonJsonE2ETest(unittest.TestCase):
                 wav_path,
                 block_size=block_size,
                 fft_size=block_size,
+                mode="peaks",
                 peak_count=6,
                 threshold=0.001,
             )
@@ -504,6 +672,7 @@ class PythonJsonE2ETest(unittest.TestCase):
                 midi_path,
                 block_size=block_size,
                 fft_size=block_size,
+                mode="peaks",
                 peak_count=6,
                 threshold=0.001,
             )

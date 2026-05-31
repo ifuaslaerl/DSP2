@@ -458,6 +458,34 @@ bool test_audio_file_input_node_streams_samples_and_pads_eof() {
     return true;
 }
 
+bool test_audio_file_input_node_supports_overlapping_hops() {
+    Engine<double> engine;
+    engine.set_signal_parameters(44100.0, 4);
+    const int audio = engine.add_node("FileSignalInput");
+    if (!expect_true(audio >= 0, "FileSignalInput overlap node must be created.")) return false;
+
+    engine.set_node_parameter_array(audio, "samples", {0.0, 1.0, 2.0, 3.0, 4.0, 5.0});
+    engine.set_node_parameter(audio, "hop_size", 2.0);
+    engine.prepare_engine();
+
+    engine.process_block();
+    const std::vector<double> first = engine.get_node_output(audio, 0);
+    engine.process_block();
+    const std::vector<double> second = engine.get_node_output(audio, 0);
+
+    const double expected_first[4] = {0.0, 1.0, 2.0, 3.0};
+    const double expected_second[4] = {2.0, 3.0, 4.0, 5.0};
+    for (int i = 0; i < 4; ++i) {
+        if (!nearly_equal(first[i], expected_first[i]) ||
+            !nearly_equal(second[i], expected_second[i])) {
+            std::cout << "FAIL: FileSignalInput overlap sample " << i << ".\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool test_real_fft_plan_impulse_response() {
     DSP2FFT::RealFFTPlan<double> plan;
     if (!expect_true(plan.configure(8), "RealFFTPlan must configure power-of-two size.")) {
@@ -776,6 +804,43 @@ bool test_harmonic_pitch_detector_handles_weak_fundamental() {
     }
 
     return true;
+}
+
+bool test_harmonic_pitch_detector_exposes_ranked_path_candidates() {
+    Graph<double> graph;
+    auto* source = new SpectrumFrameSource(
+        {0.0, 1.0, 6.0, 5.0, 4.0, 3.0, 2.0},
+        {0.0, 110.0, 220.0, 330.0, 440.0, 550.0, 660.0}
+    );
+    auto* detector = new HarmonicPitchDetector<double>();
+
+    graph.add_node(source);
+    graph.add_node(detector);
+    graph.set_node_parameter(1, "min_midi_note", 40.0);
+    graph.set_node_parameter(1, "max_midi_note", 60.0);
+    graph.set_node_parameter(1, "path_candidate_count", 3.0);
+    graph.set_node_parameter(1, "min_confidence", 0.05);
+    graph.add_edge(0, 0, 1, 0);
+    graph.add_edge(0, 1, 1, 1);
+    graph.compile(44100.0, 16);
+    graph.process();
+
+    if (!expect_true(graph.get_node_output_size(1, 2) == 3 &&
+                     graph.get_node_output_size(1, 3) == 3,
+                     "HarmonicPitchDetector candidate outputs must match path_candidate_count.")) {
+        return false;
+    }
+
+    const double* frequencies = graph.get_node_output_buffer(1, 2);
+    const double* saliences = graph.get_node_output_buffer(1, 3);
+    if (!expect_true(frequencies != nullptr && saliences != nullptr,
+                     "HarmonicPitchDetector candidate outputs must be readable.")) {
+        return false;
+    }
+
+    return expect_true(nearly_equal(frequencies[0], 110.0, kLooseTolerance) &&
+                       saliences[0] > 0.0 && saliences[0] <= 1.0,
+                       "HarmonicPitchDetector best path candidate must expose A2 salience.");
 }
 
 bool test_harmonic_pitch_detector_silence_returns_zero() {
@@ -1349,6 +1414,7 @@ int main() {
     if (!test_noise_generator_same_seed_determinism()) return 1;
     if (!test_noise_generator_different_seeds_diverge()) return 1;
     if (!test_audio_file_input_node_streams_samples_and_pads_eof()) return 1;
+    if (!test_audio_file_input_node_supports_overlapping_hops()) return 1;
     if (!test_real_fft_plan_impulse_response()) return 1;
     if (!test_spectrum_analyser_dimensions_and_frequencies()) return 1;
     if (!test_spectrum_analyser_detects_aligned_sine_bin()) return 1;
@@ -1358,6 +1424,7 @@ int main() {
     if (!test_harmonic_pitch_detector_factory()) return 1;
     if (!test_harmonic_pitch_detector_detects_pure_sine_peak()) return 1;
     if (!test_harmonic_pitch_detector_handles_weak_fundamental()) return 1;
+    if (!test_harmonic_pitch_detector_exposes_ranked_path_candidates()) return 1;
     if (!test_harmonic_pitch_detector_silence_returns_zero()) return 1;
     if (!test_harmonic_pitch_detector_ignores_notes_outside_range()) return 1;
     if (!test_frequency_to_midi_note_factory()) return 1;

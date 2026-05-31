@@ -40,6 +40,22 @@ def extract_note_on_channels(midi_bytes):
     return channels
 
 
+def extract_note_on_channel_notes(midi_bytes):
+    events = []
+    index = 0
+    while index < len(midi_bytes):
+        status = midi_bytes[index]
+        if 0x90 <= status <= 0x9F and index + 2 < len(midi_bytes):
+            note = midi_bytes[index + 1]
+            velocity = midi_bytes[index + 2]
+            if velocity > 0:
+                events.append(((status & 0x0F) + 1, note))
+            index += 3
+        else:
+            index += 1
+    return events
+
+
 class MidiIoTest(unittest.TestCase):
     def test_variable_length_quantity_encoding(self):
         self.assertEqual(encode_variable_length_quantity(0), b"\x00")
@@ -72,11 +88,11 @@ class MidiIoTest(unittest.TestCase):
         self.assertEqual(track.count(bytes([0x90, 60, 96])), 1)
         self.assertEqual(track.count(bytes([0x80, 60, 0])), 1)
 
-    def test_chord_frames_emit_multiple_note_on_events(self):
+    def test_single_mode_keeps_only_first_note_from_chord_frame(self):
         track = build_midi_track([[39, 55]], frame_ticks=120)
         notes = extract_note_on_notes(track)
 
-        self.assertEqual(notes, [39, 55])
+        self.assertEqual(notes, [39])
 
     def test_single_motor_mode_writes_channel_one(self):
         track = build_midi_track([[60]], frame_ticks=120, motor_mode="single")
@@ -96,6 +112,41 @@ class MidiIoTest(unittest.TestCase):
         )
 
         self.assertEqual(extract_note_on_channels(track), [1, 2, 3])
+
+    def test_round_robin_motor_mode_limits_polyphony_to_channel_count(self):
+        track = build_midi_track(
+            [[60, 62, 64, 65]],
+            frame_ticks=120,
+            motor_mode="round-robin",
+            channels=[1, 2],
+        )
+
+        self.assertEqual(extract_note_on_channel_notes(track), [(1, 60), (2, 62)])
+
+    def test_voices_motor_mode_maps_frame_positions_to_channels(self):
+        track = build_midi_track(
+            [[60, 64, 67, 72, 76, 79]],
+            frame_ticks=120,
+            motor_mode="voices",
+        )
+
+        self.assertEqual(
+            extract_note_on_channel_notes(track),
+            [(1, 60), (2, 64), (3, 67), (4, 72), (5, 76), (6, 79)],
+        )
+
+    def test_voices_motor_mode_silences_missing_frame_positions(self):
+        track = build_midi_track(
+            [[60, 64, 67], [62]],
+            frame_ticks=120,
+            motor_mode="voices",
+        )
+
+        self.assertIn(bytes([0x80 | 0, 60, 0]), track)
+        self.assertIn(bytes([0x80 | 1, 64, 0]), track)
+        self.assertIn(bytes([0x80 | 2, 67, 0]), track)
+        self.assertIn(bytes([0x90 | 0, 62, 96]), track)
+        self.assertNotIn(bytes([0x90 | 1, 62, 96]), track)
 
 
 if __name__ == "__main__":
