@@ -255,221 +255,150 @@ python3 dev_panel/signal_tester.py \
 ```
 
 #### 3. Conversão reproduzível para a orquestra de 6 motores
-O exportador offline transforma um arquivo de áudio em um único `.mid` tipo 0.
-Para a orquestra mecânica, os motores são representados pelos canais MIDI `1..6`
-no mesmo arquivo; o exportador não gera seis arquivos separados. O escritor MIDI
-garante que cada canal/motor tenha no máximo uma nota ativa por vez.
+O exportador offline transforma áudio em um único `.mid` tipo 0. Para a
+orquestra mecânica, os motores são representados pelos canais MIDI `1..6` no
+mesmo arquivo. O objetivo real é gerar um MIDI tocável e reconhecível para os
+motores, não uma transcrição polifônica perfeita do áudio original.
 
-O fluxo recomendado para músicas reais é o profile `recognizable-orchestra`.
-Ele usa o DSP2 para detectar uma linha melódica estável, preserva essa melodia no
-canal 1 e cria vozes harmônicas nos canais 2..6. Esse profile foi pensado para
-maximizar reconhecimento auditivo na orquestra, não para fazer uma transcrição
-polifônica perfeita do áudio original.
+O fluxo recomendado para músicas reais é o profile `recognizable-orchestra-v2`.
+Ele separa a linha principal, o baixo e uma harmonia conservadora:
+
+- `melody_only`: canal 1 toca a melodia; canais 2..6 ficam em silêncio.
+- `melody_bass`: canal 1 toca a melodia; canal 2 toca o baixo; canais 3..6 ficam
+  em silêncio.
+- `recognizable_orchestra_v2`: canal 1 toca a melodia, canal 2 toca o baixo e os
+  canais 3..6 só recebem 1 ou 2 notas extras quando a região está estável.
+
+Canais silenciosos são esperados e preferíveis a notas erradas. O escritor MIDI
+continua garantindo no máximo uma nota ativa por canal/motor.
 
 O pipeline aceita `.wav` PCM diretamente. Entradas `.mp3`, `.ogg` e outros
 formatos suportados pelo `ffmpeg` são convertidas automaticamente para um WAV
-mono temporário de 44.1 kHz antes da análise. O `ffmpeg` é instalado na imagem
-Docker do projeto; depois de atualizar o repositório, recrie o container.
+mono temporário de 44.1 kHz antes da análise.
 
-##### Setup limpo antes da gravação do vídeo ou relatório
+##### Setup e gate obrigatório
 Execute tudo a partir da raiz do repositório.
 
 ```bash
 docker compose up -d --build
 ```
 
+Antes de validar ou commitar qualquer resultado, rode:
+
 ```bash
 docker compose exec -T dsp2-env bash -lc "scripts/check.sh"
 ```
 
-O segundo comando compila os alvos `EMBEDDED` e `SIMULATION`, roda os testes C++
-e roda os testes Python. Para um relatório reproduzível, registre se esse comando
-passou antes de gerar o MIDI final.
+Esse gate compila os alvos `EMBEDDED` e `SIMULATION`, roda os testes C++ e roda
+os testes Python. Registre explicitamente se ele passar ou falhar.
 
-##### Caso principal: converter MP3 para MIDI de 6 motores
-Coloque o MP3 de teste em `pratica/bosta/lacunosa.mp3`. Depois rode exatamente:
+##### Caso principal: profile v2
+Coloque o MP3 de teste em `pratica/bosta/lacunosa.mp3`. Depois rode:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
   "python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
-    --output 'pratica/bosta/lacunosa_dsp2_6motors.mid' \
-    --profile recognizable-orchestra"
+    --output 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid' \
+    --profile recognizable-orchestra-v2"
 ```
 
 Confirme que o arquivo foi criado:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "ls -lh 'pratica/bosta/lacunosa_dsp2_6motors.mid'"
+  "ls -lh 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid'"
 ```
 
-Durante a execução, o script imprime:
-
-- caminho do MIDI gerado;
-- profile usado;
-- aviso quando a entrada foi convertida para WAV temporário;
-- quantidade de blocos processados;
-- lista de notas MIDI detectadas;
-- quantidade de logs C++ coletados, se houver.
-
-##### Variante: converter WAV para MIDI de 6 motores
-Se você já tiver um WAV, coloque-o em `pratica/bosta/lacunosa.wav` e rode:
-
-```bash
-docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
-    --input 'pratica/bosta/lacunosa.wav' \
-    --output 'pratica/bosta/lacunosa_dsp2_6motors.mid' \
-    --profile recognizable-orchestra"
-```
-
-Nesse caso não há conversão intermediária: o WAV é carregado diretamente pelo
-`dsp2.signal_io.load_pcm_timeseries_data()` e alimenta o nó `FileSignalInput`.
-
-##### Comando expandido equivalente ao profile
-Para relatório, use este comando quando precisar mostrar todos os parâmetros sem
-depender do nome do profile:
+##### Testes separados de melodia e baixo
+Para ouvir só a melodia no canal 1:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
   "python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
-    --output 'pratica/bosta/lacunosa_dsp2_6motors.mid' \
-    --mode harmony \
+    --output 'pratica/bosta/lacunosa_melody_only.mid' \
+    --mode melody_only \
     --motor-mode voices \
     --motor-count 6 \
     --block-size 2048 \
     --fft-size 4096 \
     --hop-size 1024 \
-    --path-candidate-count 5 \
-    --min-midi-note 32 \
-    --max-midi-note 83 \
-    --relative-threshold 0.08 \
-    --min-confidence 0.20 \
-    --min-note-frames 8 \
-    --merge-gap-frames 3 \
-    --harmony-voices 6 \
-    --jump-penalty 0.10 \
-    --octave-jump-penalty 0.70"
+    --min-note-ms 100 \
+    --merge-gap-ms 70"
 ```
 
-Esses parâmetros significam:
-
-- `--mode harmony`: detecta uma melodia e gera vozes adicionais depois do
-  pós-processamento.
-- `--motor-mode voices`: mapeia `frame[0]` para o canal 1, `frame[1]` para o
-  canal 2, até `frame[5]` no canal 6.
-- `--block-size 2048`, `--fft-size 4096`, `--hop-size 1024`: usam janelas
-  sobrepostas sem gerar trocas de nota excessivas.
-- `--min-midi-note 32`, `--max-midi-note 83`: restringem a região de notas para
-  a faixa observada no MIDI de referência de Lacunosa Town.
-- `--relative-threshold 0.08`, `--min-confidence 0.20`: filtram candidatos fracos
-  para evitar que ruído e harmônicos virem notas.
-- `--min-note-frames 8`, `--merge-gap-frames 3`: removem notas curtas demais e
-  unem pequenas falhas entre notas iguais.
-- `--jump-penalty 0.10`, `--octave-jump-penalty 0.70`: penalizam saltos bruscos
-  para manter a linha melódica mais estável.
-
-##### Como comparar com o MIDI já existente
-O arquivo `pratica/bosta/Lacunosa_Town (1).mid` pode ser usado como referência
-manual no vídeo ou relatório. Ele não é usado pelo algoritmo de conversão. O
-procedimento recomendado é:
-
-1. Gere `pratica/bosta/lacunosa_dsp2_6motors.mid` com um dos comandos acima.
-2. Toque primeiro `pratica/bosta/Lacunosa_Town (1).mid`.
-3. Toque depois `pratica/bosta/lacunosa_dsp2_6motors.mid`.
-4. Compare reconhecimento da melodia, estabilidade do ritmo e uso dos 6 canais.
-
-Para registrar evidência simples de que ambos existem:
-
-```bash
-docker compose exec -T dsp2-env bash -lc \
-  "ls -lh 'pratica/bosta/Lacunosa_Town (1).mid' \
-          'pratica/bosta/lacunosa_dsp2_6motors.mid'"
-```
-
-##### Ajustes se o MIDI sair ruim
-Se o MIDI sair quase vazio, reduza a confiança mínima:
+Para ouvir melodia e baixo:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
   "python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
-    --output 'pratica/bosta/lacunosa_dsp2_6motors_loose.mid' \
-    --profile recognizable-orchestra \
-    --min-confidence 0.05"
-```
-
-Se o MIDI sair poluído, aumente a confiança mínima ou o limiar relativo:
-
-```bash
-docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
-    --input 'pratica/bosta/lacunosa.mp3' \
-    --output 'pratica/bosta/lacunosa_dsp2_6motors_strict.mid' \
-    --profile recognizable-orchestra \
-    --min-confidence 0.12 \
-    --relative-threshold 0.05"
-```
-
-Se a melodia saltar oitavas demais, aumente a penalidade de salto:
-
-```bash
-docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
-    --input 'pratica/bosta/lacunosa.mp3' \
-    --output 'pratica/bosta/lacunosa_dsp2_6motors_smooth.mid' \
-    --profile recognizable-orchestra \
-    --jump-penalty 0.14 \
-    --octave-jump-penalty 0.90"
-```
-
-Quando usar overrides junto com `--profile`, o valor explícito ganha. Por exemplo,
-o comando acima mantém todo o profile `recognizable-orchestra`, mas troca apenas
-as penalidades de salto.
-
-##### Modos internos disponíveis
-Há três modos de análise:
-
-- `peaks`: exporta picos espectrais fortes por bloco. É útil para diagnóstico,
-  mas pode transformar harmônicos em notas extras.
-- `melody`: estima uma fundamental monofônica por bloco usando reforço harmônico,
-  janelas sobrepostas e seleção offline de contorno.
-- `harmony`: usa a mesma detecção de `melody` e gera vozes harmônicas para
-  preencher canais adicionais.
-
-Para diagnóstico espectral sem harmonização:
-
-```bash
-docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
-    --input 'pratica/bosta/lacunosa.mp3' \
-    --output 'pratica/bosta/lacunosa_peaks.mid' \
-    --mode peaks \
-    --block-size 2048 \
-    --peak-count 6 \
-    --threshold 0.0001"
-```
-
-Para exportar apenas a melodia no canal 1:
-
-```bash
-docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
-    --input 'pratica/bosta/lacunosa.mp3' \
-    --output 'pratica/bosta/lacunosa_melody.mid' \
-    --mode melody \
-    --motor-mode single \
+    --output 'pratica/bosta/lacunosa_melody_bass.mid' \
+    --mode melody_bass \
+    --motor-mode voices \
+    --motor-count 6 \
     --block-size 2048 \
     --fft-size 4096 \
     --hop-size 1024 \
-    --min-midi-note 32 \
-    --max-midi-note 83 \
-    --relative-threshold 0.08 \
-    --min-confidence 0.20 \
-    --min-note-frames 8 \
-    --merge-gap-frames 3"
+    --min-note-ms 100 \
+    --merge-gap-ms 70"
+```
+
+##### Parâmetros importantes
+| Parâmetro | Uso recomendado |
+| --- | --- |
+| `--block-size 2048` | tamanho do bloco processado pelo motor DSP2 |
+| `--fft-size 4096` | resolução espectral da análise |
+| `--hop-size 1024` | avanço entre janelas; define a duração de cada frame MIDI |
+| melodia `55..83` | faixa fixa dos modos novos para a linha principal |
+| baixo `32..55` | faixa fixa dos modos novos para o canal 2 |
+| harmonia `40..76` | faixa usada para notas extras conservadoras no v2 |
+| `--min-note-ms 100` | remove eventos curtos demais nos modos novos |
+| `--merge-gap-ms 70` | une pequenas lacunas entre notas iguais nos modos novos |
+
+Os modos antigos continuam disponíveis para comparação:
+
+- `peaks`: exporta picos espectrais fortes por bloco.
+- `melody`: estima uma fundamental monofônica por bloco.
+- `harmony`: usa a melodia detectada e força vozes harmônicas adicionais.
+- `recognizable-orchestra`: profile antigo baseado em `harmony`, preservado como
+  baseline.
+
+Para comparar com o profile antigo:
+
+```bash
+docker compose exec -T dsp2-env bash -lc \
+  "python3 -m examples.audio_to_midi.app \
+    --input 'pratica/bosta/lacunosa.mp3' \
+    --output 'pratica/bosta/lacunosa_dsp2_6motors_v1.mid' \
+    --profile recognizable-orchestra"
+```
+
+##### Como reproduzir depois
+Gere o arquivo principal, verifique o `.mid` e rode o gate:
+
+```bash
+docker compose exec -T dsp2-env bash -lc \
+  "python3 -m examples.audio_to_midi.app \
+    --input 'pratica/bosta/lacunosa.mp3' \
+    --output 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid' \
+    --profile recognizable-orchestra-v2"
+```
+
+```bash
+docker compose exec -T dsp2-env bash -lc \
+  "python3 - <<'PY'
+import os
+path = 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid'
+print(path, os.path.getsize(path), 'bytes')
+with open(path, 'rb') as midi:
+    print(midi.read(4).decode('ascii'))
+PY"
+```
+
+```bash
+docker compose exec -T dsp2-env bash -lc "scripts/check.sh"
 ```
 
 O mesmo fluxo está disponível como API pública:
@@ -479,20 +408,18 @@ from examples.audio_to_midi.app import export_audio_to_midi
 
 export_audio_to_midi(
     "pratica/bosta/lacunosa.mp3",
-    "pratica/bosta/lacunosa_dsp2_6motors.mid",
-    profile="recognizable-orchestra",
+    "pratica/bosta/lacunosa_dsp2_6motors_v2.mid",
+    profile="recognizable-orchestra-v2",
 )
 
 export_audio_to_midi(
     "pratica/bosta/lacunosa.wav",
-    "pratica/bosta/lacunosa_melody.mid",
-    mode="melody",
-    motor_mode="single",
+    "pratica/bosta/lacunosa_melody_bass.mid",
+    mode="melody_bass",
+    motor_mode="voices",
     motor_count=6,
-    min_midi_note=32,
-    max_midi_note=83,
-    relative_threshold=0.03,
-    min_confidence=0.08,
+    min_note_ms=100.0,
+    merge_gap_ms=70.0,
 )
 ```
 

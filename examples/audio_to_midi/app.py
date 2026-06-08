@@ -13,6 +13,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import dsp2._dsp2_core as core
 from dsp2.signal_io import load_pcm_timeseries_data
 from dsp2.graph_loader import GraphLoader
+from examples.audio_to_midi.arrangement import (
+    PitchCandidate,
+    arrange_for_motors,
+    candidates_to_frame_tuples,
+    duration_ms_to_frames,
+    note_frames_to_events,
+)
 from examples.audio_to_midi.midi_io import write_midi_file  # Import local do módulo que movemos junto
 
 NOTE_NAME_TO_PITCH_CLASS = {
@@ -61,9 +68,34 @@ RECOGNIZABLE_ORCHESTRA_PROFILE = {
     "silence_transition_penalty": 0.10,
 }
 
+RECOGNIZABLE_ORCHESTRA_V2_PROFILE = {
+    "mode": "recognizable_orchestra_v2",
+    "motor_mode": "voices",
+    "motor_count": 6,
+    "block_size": 2048,
+    "fft_size": 4096,
+    "hop_size": 1024,
+    "min_midi_note": 55,
+    "max_midi_note": 83,
+    "relative_threshold": 0.08,
+    "min_confidence": 0.20,
+    "min_note_ms": 100.0,
+    "merge_gap_ms": 70.0,
+    "path_candidate_count": 5,
+    "harmony_voices": 4,
+    "jump_penalty": 0.10,
+    "octave_jump_penalty": 0.70,
+    "silence_transition_penalty": 0.10,
+}
+
 PROFILES = {
     "recognizable-orchestra": RECOGNIZABLE_ORCHESTRA_PROFILE,
+    "recognizable-orchestra-v2": RECOGNIZABLE_ORCHESTRA_V2_PROFILE,
 }
+
+LEGACY_MODES = {"peaks", "melody", "harmony"}
+ARRANGEMENT_MODES = {"melody_only", "melody_bass", "recognizable_orchestra_v2"}
+VALID_MODES = LEGACY_MODES | ARRANGEMENT_MODES
 
 
 def _normalise_profile(profile):
@@ -71,7 +103,9 @@ def _normalise_profile(profile):
         return None
     normalised = profile.strip().lower()
     if normalised not in PROFILES:
-        raise ValueError("profile deve ser 'recognizable-orchestra'.")
+        raise ValueError(
+            "profile deve ser 'recognizable-orchestra' ou 'recognizable-orchestra-v2'."
+        )
     return normalised
 
 
@@ -140,8 +174,11 @@ def build_audio_to_midi_graph(
     min_confidence=0.2,
     path_candidate_count=5,
 ):
-    if mode not in {"peaks", "melody", "harmony"}:
-        raise ValueError("mode deve ser 'peaks', 'melody' ou 'harmony'.")
+    if mode not in VALID_MODES:
+        raise ValueError(
+            "mode deve ser 'peaks', 'melody', 'harmony', 'melody_only', "
+            "'melody_bass' ou 'recognizable_orchestra_v2'."
+        )
 
     audio_parameters = {"path": input_path}
     if hop_size is not None:
@@ -269,8 +306,11 @@ def _validate_analysis_parameters(
         raise ValueError("max_frequency deve ser maior que min_frequency.")
     if min_bin_distance < 0:
         raise ValueError("min_bin_distance nao pode ser negativo.")
-    if mode not in {"peaks", "melody", "harmony"}:
-        raise ValueError("mode deve ser 'peaks', 'melody' ou 'harmony'.")
+    if mode not in VALID_MODES:
+        raise ValueError(
+            "mode deve ser 'peaks', 'melody', 'harmony', 'melody_only', "
+            "'melody_bass' ou 'recognizable_orchestra_v2'."
+        )
     if min_midi_note < 0 or max_midi_note > 127 or max_midi_note < min_midi_note:
         raise ValueError("faixa MIDI deve estar entre 0..127 e ser crescente.")
     if harmonic_count <= 0:
@@ -519,6 +559,207 @@ def harmonize_note_frames(
     return harmonized
 
 
+def analyze_audio(
+    input_path,
+    block_size=2048,
+    fft_size=None,
+    hop_size=None,
+    peak_count=6,
+    threshold=0.001,
+    min_frequency=20.0,
+    max_frequency=None,
+    min_bin_distance=2,
+    mode="melody",
+    min_midi_note=36,
+    max_midi_note=84,
+    harmonic_count=6,
+    relative_threshold=0.05,
+    min_confidence=0.2,
+    path_candidate_count=5,
+):
+    if fft_size is None:
+        fft_size = block_size
+    if hop_size is None:
+        hop_size = block_size if mode == "peaks" else max(1, block_size // 4)
+
+    graph_mode = "peaks" if mode == "peaks" else "melody"
+    _validate_analysis_parameters(
+        block_size,
+        fft_size,
+        peak_count,
+        threshold,
+        min_frequency,
+        max_frequency,
+        min_bin_distance,
+        mode,
+        min_midi_note,
+        max_midi_note,
+        harmonic_count,
+        relative_threshold,
+        min_confidence,
+        hop_size,
+        path_candidate_count,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        analysis_input_path, converted_input = resolve_analysis_audio_path(input_path, tmpdir)
+        samples, sample_rate = load_pcm_timeseries_data(analysis_input_path)
+        block_count = max(1, int(math.ceil(len(samples) / float(hop_size))))
+
+        graph_path = os.path.join(tmpdir, "audio_to_midi_graph.json")
+        build_audio_to_midi_graph(
+            graph_path,
+            os.path.abspath(analysis_input_path),
+            fft_size,
+            peak_count,
+            threshold,
+            min_frequency,
+            max_frequency,
+            min_bin_distance,
+            mode=graph_mode,
+            hop_size=hop_size,
+            min_midi_note=min_midi_note,
+            max_midi_note=max_midi_note,
+            harmonic_count=harmonic_count,
+            relative_threshold=relative_threshold,
+            min_confidence=min_confidence,
+            path_candidate_count=path_candidate_count,
+        )
+
+        engine = core.Engine()
+        engine.set_signal_parameters(float(sample_rate), block_size)
+        node_ids = GraphLoader.load_from_json(engine, graph_path)
+        core.get_logs()
+        engine.prepare_engine()
+
+        frames = []
+        candidate_frames = []
+        for frame_index in range(block_count):
+            engine.process_block()
+            if graph_mode == "peaks":
+                notes = engine.get_node_output(node_ids["Midi"], 0)
+                frames.append([int(round(note)) for note in notes if int(round(note)) > 0])
+            else:
+                notes = engine.get_node_output(node_ids["MidiCandidates"], 0)
+                saliences = engine.get_node_output(node_ids["Pitch"], 3)
+                candidate_frames.append(
+                    [
+                        PitchCandidate(frame_index, int(round(note)), float(salience))
+                        for note, salience in zip(notes, saliences)
+                        if int(round(note)) > 0 and salience > 0.0
+                    ]
+                )
+
+        logs = core.get_logs()
+
+    return {
+        "frames": frames,
+        "candidate_frames": candidate_frames,
+        "sample_rate": sample_rate,
+        "sample_count": len(samples),
+        "block_count": block_count,
+        "hop_size": hop_size,
+        "logs": logs,
+        "mode": mode,
+        "converted_input": converted_input,
+    }
+
+
+def _filter_candidate_frames(candidate_frames, min_midi_note, max_midi_note):
+    return [
+        [
+            candidate
+            for candidate in frame
+            if min_midi_note <= int(round(candidate.midi_note)) <= max_midi_note
+        ]
+        for frame in candidate_frames
+    ]
+
+
+def _extract_note_events(
+    candidate_frames,
+    min_midi_note,
+    max_midi_note,
+    min_note_frames,
+    merge_gap_frames,
+    jump_penalty=0.04,
+    octave_jump_penalty=0.25,
+    silence_transition_penalty=0.10,
+):
+    filtered_candidates = _filter_candidate_frames(
+        candidate_frames,
+        min_midi_note,
+        max_midi_note,
+    )
+    selected_frames = select_melody_path(
+        candidates_to_frame_tuples(filtered_candidates, min_midi_note, max_midi_note),
+        jump_penalty=jump_penalty,
+        octave_jump_penalty=octave_jump_penalty,
+        silence_transition_penalty=silence_transition_penalty,
+    )
+    processed_frames = postprocess_note_frames(
+        selected_frames,
+        min_midi_note=min_midi_note,
+        max_midi_note=max_midi_note,
+        min_note_frames=min_note_frames,
+        merge_gap_frames=merge_gap_frames,
+    )
+    return note_frames_to_events(processed_frames, filtered_candidates), processed_frames
+
+
+def extract_melody(
+    candidate_frames,
+    min_note_frames,
+    merge_gap_frames,
+    min_midi_note=55,
+    max_midi_note=83,
+    jump_penalty=0.04,
+    octave_jump_penalty=0.25,
+    silence_transition_penalty=0.10,
+):
+    return _extract_note_events(
+        candidate_frames,
+        min_midi_note,
+        max_midi_note,
+        min_note_frames,
+        merge_gap_frames,
+        jump_penalty=jump_penalty,
+        octave_jump_penalty=octave_jump_penalty,
+        silence_transition_penalty=silence_transition_penalty,
+    )
+
+
+def extract_bass(
+    candidate_frames,
+    min_note_frames,
+    merge_gap_frames,
+    min_midi_note=32,
+    max_midi_note=55,
+    jump_penalty=0.04,
+    octave_jump_penalty=0.25,
+    silence_transition_penalty=0.10,
+):
+    return _extract_note_events(
+        candidate_frames,
+        min_midi_note,
+        max_midi_note,
+        min_note_frames,
+        merge_gap_frames,
+        jump_penalty=jump_penalty,
+        octave_jump_penalty=octave_jump_penalty,
+        silence_transition_penalty=silence_transition_penalty,
+    )
+
+
+def _duration_frames_for_arrangement(min_note_ms, merge_gap_ms, hop_size, sample_rate):
+    min_note = 100.0 if min_note_ms is None else min_note_ms
+    merge_gap = 70.0 if merge_gap_ms is None else merge_gap_ms
+    return (
+        duration_ms_to_frames(min_note, hop_size, sample_rate),
+        duration_ms_to_frames(merge_gap, hop_size, sample_rate, allow_zero=True),
+    )
+
+
 def collect_midi_note_frames(
     input_path,
     block_size=2048,
@@ -538,6 +779,8 @@ def collect_midi_note_frames(
     path_candidate_count=5,
     min_note_frames=2,
     merge_gap_frames=1,
+    min_note_ms=None,
+    merge_gap_ms=None,
     harmony_key="D",
     harmony_scale="minor",
     harmony_voices=6,
@@ -550,42 +793,20 @@ def collect_midi_note_frames(
         fft_size = block_size
     if hop_size is None:
         hop_size = block_size if mode == "peaks" else max(1, block_size // 4)
-    _validate_analysis_parameters(
-        block_size,
-        fft_size,
-        peak_count,
-        threshold,
-        min_frequency,
-        max_frequency,
-        min_bin_distance,
-        mode,
-        min_midi_note,
-        max_midi_note,
-        harmonic_count,
-        relative_threshold,
-        min_confidence,
-        hop_size,
-        path_candidate_count,
-    )
     _validate_motor_count(motor_count)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        analysis_input_path, converted_input = resolve_analysis_audio_path(input_path, tmpdir)
-        samples, sample_rate = load_pcm_timeseries_data(analysis_input_path)
-        block_count = max(1, int(math.ceil(len(samples) / float(hop_size))))
-
-        graph_path = os.path.join(tmpdir, "audio_to_midi_graph.json")
-        build_audio_to_midi_graph(
-            graph_path,
-            os.path.abspath(analysis_input_path),
-            fft_size,
-            peak_count,
-            threshold,
-            min_frequency,
-            max_frequency,
-            min_bin_distance,
-            mode="melody" if mode == "harmony" else mode,
+    if mode in LEGACY_MODES:
+        capture = analyze_audio(
+            input_path,
+            block_size=block_size,
+            fft_size=fft_size,
             hop_size=hop_size,
+            peak_count=peak_count,
+            threshold=threshold,
+            min_frequency=min_frequency,
+            max_frequency=max_frequency,
+            min_bin_distance=min_bin_distance,
+            mode=mode,
             min_midi_note=min_midi_note,
             max_midi_note=max_midi_note,
             harmonic_count=harmonic_count,
@@ -594,66 +815,127 @@ def collect_midi_note_frames(
             path_candidate_count=path_candidate_count,
         )
 
-        engine = core.Engine()
-        engine.set_signal_parameters(float(sample_rate), block_size)
-        node_ids = GraphLoader.load_from_json(engine, graph_path)
-        core.get_logs()
-        engine.prepare_engine()
+        frames = capture["frames"]
+        if mode in {"melody", "harmony"}:
+            frames = select_melody_path(
+                candidates_to_frame_tuples(
+                    capture["candidate_frames"],
+                    min_midi_note,
+                    max_midi_note,
+                ),
+                jump_penalty=jump_penalty,
+                octave_jump_penalty=octave_jump_penalty,
+                silence_transition_penalty=silence_transition_penalty,
+            )
+            frames = postprocess_note_frames(
+                frames,
+                min_midi_note=min_midi_note,
+                max_midi_note=max_midi_note,
+                min_note_frames=min_note_frames,
+                merge_gap_frames=merge_gap_frames,
+            )
+        if mode == "harmony":
+            frames = harmonize_note_frames(
+                frames,
+                harmony_key=harmony_key,
+                harmony_scale=harmony_scale,
+                harmony_voices=min(harmony_voices, motor_count),
+                min_midi_note=min_midi_note,
+                max_midi_note=max_midi_note,
+            )
 
-        frames = []
-        candidate_frames = []
-        for _ in range(block_count):
-            engine.process_block()
-            if mode == "peaks":
-                notes = engine.get_node_output(node_ids["Midi"], 0)
-                frames.append([int(round(note)) for note in notes if int(round(note)) > 0])
-            else:
-                notes = engine.get_node_output(node_ids["MidiCandidates"], 0)
-                saliences = engine.get_node_output(node_ids["Pitch"], 3)
-                candidate_frames.append(
-                    [
-                        (int(round(note)), float(salience))
-                        for note, salience in zip(notes, saliences)
-                        if int(round(note)) > 0 and salience > 0.0
-                    ]
-                )
+        capture["frames"] = frames
+        return capture
 
-        logs = core.get_logs()
+    melody_capture = analyze_audio(
+        input_path,
+        block_size=block_size,
+        fft_size=fft_size,
+        hop_size=hop_size,
+        peak_count=peak_count,
+        threshold=threshold,
+        min_frequency=min_frequency,
+        max_frequency=max_frequency,
+        min_bin_distance=min_bin_distance,
+        mode=mode,
+        min_midi_note=55,
+        max_midi_note=83,
+        harmonic_count=harmonic_count,
+        relative_threshold=relative_threshold,
+        min_confidence=min_confidence,
+        path_candidate_count=path_candidate_count,
+    )
+    min_frames, merge_frames = _duration_frames_for_arrangement(
+        min_note_ms,
+        merge_gap_ms,
+        melody_capture["hop_size"],
+        melody_capture["sample_rate"],
+    )
+    melody_events, _ = extract_melody(
+        melody_capture["candidate_frames"],
+        min_frames,
+        merge_frames,
+        min_midi_note=55,
+        max_midi_note=83,
+        jump_penalty=jump_penalty,
+        octave_jump_penalty=octave_jump_penalty,
+        silence_transition_penalty=silence_transition_penalty,
+    )
 
-    if mode in {"melody", "harmony"}:
-        frames = select_melody_path(
-            candidate_frames,
+    bass_events = []
+    logs = list(melody_capture["logs"])
+    converted_input = melody_capture["converted_input"]
+    if mode in {"melody_bass", "recognizable_orchestra_v2"}:
+        bass_capture = analyze_audio(
+            input_path,
+            block_size=block_size,
+            fft_size=fft_size,
+            hop_size=hop_size,
+            peak_count=peak_count,
+            threshold=threshold,
+            min_frequency=min_frequency,
+            max_frequency=max_frequency,
+            min_bin_distance=min_bin_distance,
+            mode=mode,
+            min_midi_note=32,
+            max_midi_note=55,
+            harmonic_count=harmonic_count,
+            relative_threshold=relative_threshold,
+            min_confidence=min_confidence,
+            path_candidate_count=path_candidate_count,
+        )
+        bass_events, _ = extract_bass(
+            bass_capture["candidate_frames"],
+            min_frames,
+            merge_frames,
+            min_midi_note=32,
+            max_midi_note=55,
             jump_penalty=jump_penalty,
             octave_jump_penalty=octave_jump_penalty,
             silence_transition_penalty=silence_transition_penalty,
         )
-        frames = postprocess_note_frames(
-            frames,
-            min_midi_note=min_midi_note,
-            max_midi_note=max_midi_note,
-            min_note_frames=min_note_frames,
-            merge_gap_frames=merge_gap_frames,
-        )
-    if mode == "harmony":
-        frames = harmonize_note_frames(
-            frames,
-            harmony_key=harmony_key,
-            harmony_scale=harmony_scale,
-            harmony_voices=min(harmony_voices, motor_count),
-            min_midi_note=min_midi_note,
-            max_midi_note=max_midi_note,
-        )
+        logs.extend(bass_capture["logs"])
+        converted_input = converted_input or bass_capture["converted_input"]
 
-    return {
-        "frames": frames,
-        "sample_rate": sample_rate,
-        "sample_count": len(samples),
-        "block_count": block_count,
-        "hop_size": hop_size,
-        "logs": logs,
-        "mode": mode,
-        "converted_input": converted_input,
-    }
+    voices, frames = arrange_for_motors(
+        melody_events,
+        bass_events=bass_events,
+        mode=mode,
+        frame_count=melody_capture["block_count"],
+        motor_count=motor_count,
+        harmony_min_midi_note=40,
+        harmony_max_midi_note=76,
+        harmony_confidence=max(0.55, min_confidence + 0.20),
+        stable_note_frames=max(min_frames, 4),
+    )
+    melody_capture["frames"] = frames
+    melody_capture["voices"] = voices
+    melody_capture["logs"] = logs
+    melody_capture["mode"] = mode
+    melody_capture["converted_input"] = converted_input
+    melody_capture["min_note_frames"] = min_frames
+    melody_capture["merge_gap_frames"] = merge_frames
+    return melody_capture
 
 
 def export_audio_to_midi(
@@ -682,6 +964,8 @@ def export_audio_to_midi(
     path_candidate_count=5,
     min_note_frames=2,
     merge_gap_frames=1,
+    min_note_ms=None,
+    merge_gap_ms=None,
     harmony_key="D",
     harmony_scale="minor",
     harmony_voices=6,
@@ -702,8 +986,10 @@ def export_audio_to_midi(
         max_midi_note = profile_parameters["max_midi_note"]
         relative_threshold = profile_parameters["relative_threshold"]
         min_confidence = profile_parameters["min_confidence"]
-        min_note_frames = profile_parameters["min_note_frames"]
-        merge_gap_frames = profile_parameters["merge_gap_frames"]
+        min_note_frames = profile_parameters.get("min_note_frames", min_note_frames)
+        merge_gap_frames = profile_parameters.get("merge_gap_frames", merge_gap_frames)
+        min_note_ms = profile_parameters.get("min_note_ms", min_note_ms)
+        merge_gap_ms = profile_parameters.get("merge_gap_ms", merge_gap_ms)
         path_candidate_count = profile_parameters["path_candidate_count"]
         harmony_voices = profile_parameters["harmony_voices"]
         jump_penalty = profile_parameters["jump_penalty"]
@@ -735,6 +1021,8 @@ def export_audio_to_midi(
         path_candidate_count=path_candidate_count,
         min_note_frames=min_note_frames,
         merge_gap_frames=merge_gap_frames,
+        min_note_ms=min_note_ms,
+        merge_gap_ms=merge_gap_ms,
         harmony_key=harmony_key,
         harmony_scale=harmony_scale,
         harmony_voices=harmony_voices,
@@ -756,7 +1044,7 @@ def export_audio_to_midi(
         velocity=velocity,
         program=program,
         ppq=ppq,
-        motor_mode=motor_mode or ("voices" if mode == "harmony" else "single"),
+        motor_mode=motor_mode or ("voices" if mode in {"harmony"} | ARRANGEMENT_MODES else "single"),
         channels=range(1, motor_count + 1),
     )
 
@@ -798,7 +1086,7 @@ def main():
         "--profile",
         choices=sorted(PROFILES.keys()),
         default=None,
-        help="Preset reproduzivel de conversao. Use recognizable-orchestra para 6 motores.",
+        help="Preset reproduzivel de conversao. Use recognizable-orchestra-v2 para o arranjo recomendado.",
     )
     parser.add_argument("--block-size", type=int, default=2048, help="Tamanho de bloco de analise.")
     parser.add_argument("--fft-size", type=int, default=None, help="Tamanho da FFT; default igual ao block-size.")
@@ -808,7 +1096,7 @@ def main():
     parser.add_argument("--min-frequency", type=float, default=20.0, help="Menor frequencia analisada em Hz.")
     parser.add_argument("--max-frequency", type=float, default=None, help="Maior frequencia analisada em Hz.")
     parser.add_argument("--min-bin-distance", type=int, default=2, help="Distancia minima entre picos espectrais.")
-    parser.add_argument("--mode", choices=["peaks", "melody", "harmony"], default="melody", help="Modo de transcricao.")
+    parser.add_argument("--mode", choices=sorted(VALID_MODES), default="melody", help="Modo de transcricao.")
     parser.add_argument(
         "--motor-mode",
         choices=["single", "unison", "round-robin", "voices"],
@@ -824,6 +1112,8 @@ def main():
     parser.add_argument("--path-candidate-count", type=int, default=5, help="Candidatos por janela para estabilizacao melodica offline.")
     parser.add_argument("--min-note-frames", type=int, default=2, help="Duracao minima em blocos no modo melody.")
     parser.add_argument("--merge-gap-frames", type=int, default=1, help="Lacuna maxima para unir notas iguais.")
+    parser.add_argument("--min-note-ms", type=float, default=None, help="Duracao minima em ms nos modos novos.")
+    parser.add_argument("--merge-gap-ms", type=float, default=None, help="Lacuna maxima em ms nos modos novos.")
     parser.add_argument("--harmony-key", default="D", help="Tonalidade do modo harmony.")
     parser.add_argument("--harmony-scale", default="minor", help="Escala do modo harmony: major ou minor.")
     parser.add_argument("--harmony-voices", type=int, default=6, help="Numero maximo de vozes no modo harmony.")
@@ -860,6 +1150,8 @@ def main():
         path_candidate_count=args.path_candidate_count,
         min_note_frames=args.min_note_frames,
         merge_gap_frames=args.merge_gap_frames,
+        min_note_ms=args.min_note_ms,
+        merge_gap_ms=args.merge_gap_ms,
         harmony_key=args.harmony_key,
         harmony_scale=args.harmony_scale,
         harmony_voices=args.harmony_voices,
@@ -872,7 +1164,7 @@ def main():
         ppq=args.ppq,
     )
 
-    unique_notes = sorted({note for frame in result["frames"] for note in frame})
+    unique_notes = sorted({note for frame in result["frames"] for note in frame if note > 0})
     print(f"MIDI gerado: {args.output}")
     if args.profile:
         print(f"Profile usado: {args.profile}")

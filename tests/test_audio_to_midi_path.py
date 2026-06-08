@@ -2,6 +2,8 @@ import unittest
 from unittest import mock
 
 from examples.audio_to_midi.app import (
+    ARRANGEMENT_MODES,
+    VALID_MODES,
     apply_profile_to_args,
     export_audio_to_midi,
     get_profile_parameters,
@@ -49,6 +51,24 @@ class AudioToMidiPathTest(unittest.TestCase):
         self.assertAlmostEqual(profile["jump_penalty"], 0.10)
         self.assertAlmostEqual(profile["octave_jump_penalty"], 0.70)
 
+    def test_new_arrangement_modes_are_exposed(self):
+        self.assertLessEqual(
+            {"melody_only", "melody_bass", "recognizable_orchestra_v2"},
+            VALID_MODES,
+        )
+        self.assertEqual(len(ARRANGEMENT_MODES), 3)
+
+    def test_recognizable_orchestra_v2_profile_parameters(self):
+        profile = get_profile_parameters("recognizable-orchestra-v2")
+
+        self.assertEqual(profile["mode"], "recognizable_orchestra_v2")
+        self.assertEqual(profile["motor_mode"], "voices")
+        self.assertEqual(profile["motor_count"], 6)
+        self.assertEqual(profile["min_midi_note"], 55)
+        self.assertEqual(profile["max_midi_note"], 83)
+        self.assertAlmostEqual(profile["min_note_ms"], 100.0)
+        self.assertAlmostEqual(profile["merge_gap_ms"], 70.0)
+
     def test_profile_application_preserves_explicit_cli_overrides(self):
         class Args:
             profile = "recognizable-orchestra"
@@ -64,6 +84,8 @@ class AudioToMidiPathTest(unittest.TestCase):
             min_confidence = 0.2
             min_note_frames = 2
             merge_gap_frames = 1
+            min_note_ms = None
+            merge_gap_ms = None
             path_candidate_count = 5
             harmony_voices = 6
             jump_penalty = 0.04
@@ -81,6 +103,37 @@ class AudioToMidiPathTest(unittest.TestCase):
         self.assertAlmostEqual(args.min_confidence, 0.2)
         self.assertAlmostEqual(args.jump_penalty, 0.04)
         self.assertAlmostEqual(args.octave_jump_penalty, 0.70)
+
+    def test_v2_profile_application_preserves_explicit_ms_override(self):
+        class Args:
+            profile = "recognizable-orchestra-v2"
+            mode = "melody"
+            motor_mode = None
+            motor_count = 1
+            block_size = 1024
+            fft_size = None
+            hop_size = None
+            min_midi_note = 36
+            max_midi_note = 84
+            relative_threshold = 0.05
+            min_confidence = 0.2
+            min_note_frames = 2
+            merge_gap_frames = 1
+            min_note_ms = 120.0
+            merge_gap_ms = None
+            path_candidate_count = 5
+            harmony_voices = 6
+            jump_penalty = 0.04
+            octave_jump_penalty = 0.25
+            silence_transition_penalty = 0.10
+
+        args = Args()
+        apply_profile_to_args(args, {"min_note_ms"})
+
+        self.assertEqual(args.mode, "recognizable_orchestra_v2")
+        self.assertEqual(args.motor_mode, "voices")
+        self.assertAlmostEqual(args.min_note_ms, 120.0)
+        self.assertAlmostEqual(args.merge_gap_ms, 70.0)
 
     def test_wav_input_is_used_directly_for_analysis(self):
         path, converted = resolve_analysis_audio_path("musica.wav", "/tmp")
