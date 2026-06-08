@@ -2,6 +2,8 @@ import argparse
 import json
 import math
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -38,6 +40,86 @@ SCALE_INTERVALS = {
     "minor": (0, 2, 3, 5, 7, 8, 10),
     "natural_minor": (0, 2, 3, 5, 7, 8, 10),
 }
+
+RECOGNIZABLE_ORCHESTRA_PROFILE = {
+    "mode": "harmony",
+    "motor_mode": "voices",
+    "motor_count": 6,
+    "block_size": 2048,
+    "fft_size": 4096,
+    "hop_size": 1024,
+    "min_midi_note": 32,
+    "max_midi_note": 83,
+    "relative_threshold": 0.08,
+    "min_confidence": 0.20,
+    "min_note_frames": 8,
+    "merge_gap_frames": 3,
+    "path_candidate_count": 5,
+    "harmony_voices": 6,
+    "jump_penalty": 0.10,
+    "octave_jump_penalty": 0.70,
+    "silence_transition_penalty": 0.10,
+}
+
+PROFILES = {
+    "recognizable-orchestra": RECOGNIZABLE_ORCHESTRA_PROFILE,
+}
+
+
+def _normalise_profile(profile):
+    if profile is None:
+        return None
+    normalised = profile.strip().lower()
+    if normalised not in PROFILES:
+        raise ValueError("profile deve ser 'recognizable-orchestra'.")
+    return normalised
+
+
+def get_profile_parameters(profile):
+    normalised = _normalise_profile(profile)
+    if normalised is None:
+        return {}
+    return dict(PROFILES[normalised])
+
+
+def convert_to_analysis_wav(input_path, output_path):
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path is None:
+        raise RuntimeError(
+            "ffmpeg nao encontrado. Recrie o container com "
+            "`docker compose up -d --build` para converter MP3/OGG para WAV."
+        )
+
+    command = [
+        ffmpeg_path,
+        "-y",
+        "-i",
+        input_path,
+        "-ac",
+        "1",
+        "-ar",
+        "44100",
+        "-sample_fmt",
+        "s16",
+        output_path,
+    ]
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode("utf-8", errors="replace").strip()
+        if stderr:
+            raise RuntimeError(f"ffmpeg falhou ao converter o audio: {stderr}") from exc
+        raise RuntimeError("ffmpeg falhou ao converter o audio.") from exc
+
+
+def resolve_analysis_audio_path(input_path, workspace_dir):
+    extension = os.path.splitext(input_path)[1].lower()
+    if extension == ".wav":
+        return input_path, False
+
+    converted_path = os.path.join(workspace_dir, "analysis_input.wav")
+    convert_to_analysis_wav(input_path, converted_path)
+    return converted_path, True
 
 
 def build_audio_to_midi_graph(
@@ -460,6 +542,9 @@ def collect_midi_note_frames(
     harmony_scale="minor",
     harmony_voices=6,
     motor_count=6,
+    jump_penalty=0.04,
+    octave_jump_penalty=0.25,
+    silence_transition_penalty=0.10,
 ):
     if fft_size is None:
         fft_size = block_size
@@ -484,14 +569,15 @@ def collect_midi_note_frames(
     )
     _validate_motor_count(motor_count)
 
-    samples, sample_rate = load_pcm_timeseries_data(input_path)
-    block_count = max(1, int(math.ceil(len(samples) / float(hop_size))))
-
     with tempfile.TemporaryDirectory() as tmpdir:
+        analysis_input_path, converted_input = resolve_analysis_audio_path(input_path, tmpdir)
+        samples, sample_rate = load_pcm_timeseries_data(analysis_input_path)
+        block_count = max(1, int(math.ceil(len(samples) / float(hop_size))))
+
         graph_path = os.path.join(tmpdir, "audio_to_midi_graph.json")
         build_audio_to_midi_graph(
             graph_path,
-            os.path.abspath(input_path),
+            os.path.abspath(analysis_input_path),
             fft_size,
             peak_count,
             threshold,
@@ -535,7 +621,12 @@ def collect_midi_note_frames(
         logs = core.get_logs()
 
     if mode in {"melody", "harmony"}:
-        frames = select_melody_path(candidate_frames)
+        frames = select_melody_path(
+            candidate_frames,
+            jump_penalty=jump_penalty,
+            octave_jump_penalty=octave_jump_penalty,
+            silence_transition_penalty=silence_transition_penalty,
+        )
         frames = postprocess_note_frames(
             frames,
             min_midi_note=min_midi_note,
@@ -561,6 +652,7 @@ def collect_midi_note_frames(
         "hop_size": hop_size,
         "logs": logs,
         "mode": mode,
+        "converted_input": converted_input,
     }
 
 
@@ -593,7 +685,31 @@ def export_audio_to_midi(
     harmony_key="D",
     harmony_scale="minor",
     harmony_voices=6,
+    jump_penalty=0.04,
+    octave_jump_penalty=0.25,
+    silence_transition_penalty=0.10,
+    profile=None,
 ):
+    if profile is not None:
+        profile_parameters = get_profile_parameters(profile)
+        mode = profile_parameters["mode"]
+        motor_mode = profile_parameters["motor_mode"]
+        motor_count = profile_parameters["motor_count"]
+        block_size = profile_parameters["block_size"]
+        fft_size = profile_parameters["fft_size"]
+        hop_size = profile_parameters["hop_size"]
+        min_midi_note = profile_parameters["min_midi_note"]
+        max_midi_note = profile_parameters["max_midi_note"]
+        relative_threshold = profile_parameters["relative_threshold"]
+        min_confidence = profile_parameters["min_confidence"]
+        min_note_frames = profile_parameters["min_note_frames"]
+        merge_gap_frames = profile_parameters["merge_gap_frames"]
+        path_candidate_count = profile_parameters["path_candidate_count"]
+        harmony_voices = profile_parameters["harmony_voices"]
+        jump_penalty = profile_parameters["jump_penalty"]
+        octave_jump_penalty = profile_parameters["octave_jump_penalty"]
+        silence_transition_penalty = profile_parameters["silence_transition_penalty"]
+
     if tempo_bpm <= 0.0:
         raise ValueError("tempo_bpm deve ser positivo.")
     if ppq <= 0:
@@ -623,6 +739,9 @@ def export_audio_to_midi(
         harmony_scale=harmony_scale,
         harmony_voices=harmony_voices,
         motor_count=motor_count,
+        jump_penalty=jump_penalty,
+        octave_jump_penalty=octave_jump_penalty,
+        silence_transition_penalty=silence_transition_penalty,
     )
 
     ticks_per_second = ppq * (tempo_bpm / 60.0)
@@ -646,10 +765,41 @@ def export_audio_to_midi(
     return capture
 
 
+def _explicit_cli_dests(parser, argv):
+    option_to_dest = {}
+    for action in parser._actions:
+        for option in action.option_strings:
+            option_to_dest[option] = action.dest
+
+    explicit = set()
+    for token in argv:
+        if not token.startswith("--"):
+            continue
+        option = token.split("=", 1)[0]
+        if option in option_to_dest:
+            explicit.add(option_to_dest[option])
+    return explicit
+
+
+def apply_profile_to_args(args, explicit_dests):
+    if args.profile is None:
+        return
+
+    for name, value in get_profile_parameters(args.profile).items():
+        if name not in explicit_dests:
+            setattr(args, name, value)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Exporta um WAV para MIDI usando o pipeline DSP2.")
-    parser.add_argument("--input", required=True, help="Arquivo WAV PCM de entrada.")
+    parser.add_argument("--input", required=True, help="Arquivo WAV PCM ou audio compativel com ffmpeg.")
     parser.add_argument("--output", default="dev_panel/outputs/export.mid", help="Arquivo .mid de saida.")    
+    parser.add_argument(
+        "--profile",
+        choices=sorted(PROFILES.keys()),
+        default=None,
+        help="Preset reproduzivel de conversao. Use recognizable-orchestra para 6 motores.",
+    )
     parser.add_argument("--block-size", type=int, default=2048, help="Tamanho de bloco de analise.")
     parser.add_argument("--fft-size", type=int, default=None, help="Tamanho da FFT; default igual ao block-size.")
     parser.add_argument("--hop-size", type=int, default=None, help="Avanco entre janelas; default block-size/4 no modo melody.")
@@ -677,12 +827,17 @@ def main():
     parser.add_argument("--harmony-key", default="D", help="Tonalidade do modo harmony.")
     parser.add_argument("--harmony-scale", default="minor", help="Escala do modo harmony: major ou minor.")
     parser.add_argument("--harmony-voices", type=int, default=6, help="Numero maximo de vozes no modo harmony.")
+    parser.add_argument("--jump-penalty", type=float, default=0.04, help="Penalidade por salto melodico entre janelas.")
+    parser.add_argument("--octave-jump-penalty", type=float, default=0.25, help="Penalidade extra para saltos de oitava ou maiores.")
+    parser.add_argument("--silence-transition-penalty", type=float, default=0.10, help="Penalidade para entrar ou sair de silencio.")
     parser.add_argument("--tempo-bpm", type=float, default=120.0, help="Tempo do arquivo MIDI exportado.")
     parser.add_argument("--velocity", type=int, default=96, help="Velocidade MIDI das notas.")
     parser.add_argument("--program", type=int, default=0, help="Program change MIDI, default piano acustico.")
     parser.add_argument("--ppq", type=int, default=480, help="Pulsos MIDI por seminima.")
 
+    explicit_dests = _explicit_cli_dests(parser, sys.argv[1:])
     args = parser.parse_args()
+    apply_profile_to_args(args, explicit_dests)
     result = export_audio_to_midi(
         args.input,
         args.output,
@@ -708,6 +863,9 @@ def main():
         harmony_key=args.harmony_key,
         harmony_scale=args.harmony_scale,
         harmony_voices=args.harmony_voices,
+        jump_penalty=args.jump_penalty,
+        octave_jump_penalty=args.octave_jump_penalty,
+        silence_transition_penalty=args.silence_transition_penalty,
         tempo_bpm=args.tempo_bpm,
         velocity=args.velocity,
         program=args.program,
@@ -716,6 +874,10 @@ def main():
 
     unique_notes = sorted({note for frame in result["frames"] for note in frame})
     print(f"MIDI gerado: {args.output}")
+    if args.profile:
+        print(f"Profile usado: {args.profile}")
+    if result["converted_input"]:
+        print("Entrada convertida para WAV PCM temporario antes da analise.")
     print(f"Blocos processados: {result['block_count']}")
     print(f"Notas detectadas: {unique_notes}")
     if result["logs"]:

@@ -148,6 +148,23 @@ class MidiIoTest(unittest.TestCase):
         self.assertIn(bytes([0x90 | 0, 62, 96]), track)
         self.assertNotIn(bytes([0x90 | 1, 62, 96]), track)
 
+    def test_voices_motor_mode_turns_channel_off_before_next_note(self):
+        track = build_midi_track(
+            [[60, 64], [62, 65]],
+            frame_ticks=120,
+            motor_mode="voices",
+            channels=[1, 2],
+        )
+
+        self.assertLess(
+            track.index(bytes([0x80 | 0, 60, 0])),
+            track.index(bytes([0x90 | 0, 62, 96])),
+        )
+        self.assertLess(
+            track.index(bytes([0x80 | 1, 64, 0])),
+            track.index(bytes([0x90 | 1, 65, 96])),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
