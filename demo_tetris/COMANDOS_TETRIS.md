@@ -26,6 +26,12 @@ docker compose exec -T dsp2-env bash -lc "python3 -m examples.audio_to_midi.app 
 docker compose exec -T dsp2-env bash -lc "python3 -m examples.audio_to_midi.app --input 'demo_tetris/tetris.wav' --output 'demo_tetris/tetris_6motors_v2_tuned.mid' --profile recognizable-orchestra-v2 --hop-size 512 --min-note-ms 70 --merge-gap-ms 45"
 ```
 
+## 3.2. Opcional: gerar variante ajustada com faixa de melodia
+
+```bash
+docker compose exec -T dsp2-env bash -lc "python3 -m examples.audio_to_midi.app --input 'demo_tetris/tetris.wav' --output 'demo_tetris/tetris_6motors_v2_tuned_melody_range.mid' --profile recognizable-orchestra-v2 --hop-size 512 --min-note-ms 70 --merge-gap-ms 45 --melody-min-midi-note 64 --melody-max-midi-note 83"
+```
+
 ## 4. Confirmar que o arquivo foi criado
 
 ```bash
@@ -38,5 +44,6 @@ docker compose exec -T dsp2-env bash -lc "ls -lh 'demo_tetris/tetris_6motors_v2.
 - Video original de referencia: `demo_tetris/tetris.mp4`
 - Saida para abrir no MidPlayer: `demo_tetris/tetris_6motors_v2.mid`
 - Saida opcional ajustada: `demo_tetris/tetris_6motors_v2_tuned.mid`
+- Saida opcional ajustada com faixa de melodia: `demo_tetris/tetris_6motors_v2_tuned_melody_range.mid`
 
 Use sempre a pasta `demo_tetris`, sem acentos, para evitar falhas do MidPlayer com caminhos Unicode.

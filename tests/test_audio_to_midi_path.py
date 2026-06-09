@@ -5,11 +5,13 @@ from examples.audio_to_midi.app import (
     ARRANGEMENT_MODES,
     VALID_MODES,
     apply_profile_to_args,
+    collect_midi_note_frames,
     export_audio_to_midi,
     get_profile_parameters,
     resolve_analysis_audio_path,
     select_melody_path,
 )
+from examples.audio_to_midi.arrangement import PitchCandidate
 
 
 class AudioToMidiPathTest(unittest.TestCase):
@@ -134,6 +136,90 @@ class AudioToMidiPathTest(unittest.TestCase):
         self.assertEqual(args.motor_mode, "voices")
         self.assertAlmostEqual(args.min_note_ms, 120.0)
         self.assertAlmostEqual(args.merge_gap_ms, 70.0)
+
+    def test_v2_defaults_keep_current_melody_and_bass_ranges(self):
+        def capture():
+            return {
+                "candidate_frames": [
+                    [
+                        PitchCandidate(0, 52, 0.99),
+                        PitchCandidate(0, 60, 0.95),
+                        PitchCandidate(0, 69, 0.70),
+                    ],
+                    [
+                        PitchCandidate(1, 52, 0.99),
+                        PitchCandidate(1, 60, 0.95),
+                        PitchCandidate(1, 69, 0.70),
+                    ],
+                ],
+                "sample_rate": 1000,
+                "sample_count": 200,
+                "block_count": 2,
+                "hop_size": 100,
+                "logs": [],
+                "converted_input": False,
+            }
+
+        with mock.patch(
+            "examples.audio_to_midi.app.analyze_audio",
+            side_effect=[capture(), capture()],
+        ) as analyze:
+            result = collect_midi_note_frames(
+                "song.wav",
+                mode="recognizable_orchestra_v2",
+                motor_count=2,
+                min_note_ms=1.0,
+                merge_gap_ms=0.0,
+            )
+
+        melody_kwargs = analyze.call_args_list[0].kwargs
+        bass_kwargs = analyze.call_args_list[1].kwargs
+        self.assertEqual((melody_kwargs["min_midi_note"], melody_kwargs["max_midi_note"]), (55, 83))
+        self.assertEqual((bass_kwargs["min_midi_note"], bass_kwargs["max_midi_note"]), (32, 55))
+        self.assertEqual(result["frames"][0][:2], [60, 52])
+
+    def test_v2_custom_melody_range_does_not_change_bass_range(self):
+        def capture():
+            return {
+                "candidate_frames": [
+                    [
+                        PitchCandidate(0, 52, 0.99),
+                        PitchCandidate(0, 60, 0.95),
+                        PitchCandidate(0, 69, 0.70),
+                    ],
+                    [
+                        PitchCandidate(1, 52, 0.99),
+                        PitchCandidate(1, 60, 0.95),
+                        PitchCandidate(1, 69, 0.70),
+                    ],
+                ],
+                "sample_rate": 1000,
+                "sample_count": 200,
+                "block_count": 2,
+                "hop_size": 100,
+                "logs": [],
+                "converted_input": False,
+            }
+
+        with mock.patch(
+            "examples.audio_to_midi.app.analyze_audio",
+            side_effect=[capture(), capture()],
+        ) as analyze:
+            result = collect_midi_note_frames(
+                "song.wav",
+                mode="recognizable_orchestra_v2",
+                motor_count=2,
+                min_note_ms=1.0,
+                merge_gap_ms=0.0,
+                melody_min_midi_note=64,
+                melody_max_midi_note=83,
+            )
+
+        melody_kwargs = analyze.call_args_list[0].kwargs
+        bass_kwargs = analyze.call_args_list[1].kwargs
+        self.assertEqual((melody_kwargs["min_midi_note"], melody_kwargs["max_midi_note"]), (64, 83))
+        self.assertEqual((bass_kwargs["min_midi_note"], bass_kwargs["max_midi_note"]), (32, 55))
+        self.assertEqual(result["frames"][0][:2], [69, 52])
 
     def test_wav_input_is_used_directly_for_analysis(self):
         path, converted = resolve_analysis_audio_path("musica.wav", "/tmp")

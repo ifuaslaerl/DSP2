@@ -785,6 +785,8 @@ def collect_midi_note_frames(
     harmony_scale="minor",
     harmony_voices=6,
     motor_count=6,
+    melody_min_midi_note=None,
+    melody_max_midi_note=None,
     jump_penalty=0.04,
     octave_jump_penalty=0.25,
     silence_transition_penalty=0.10,
@@ -847,6 +849,9 @@ def collect_midi_note_frames(
         capture["frames"] = frames
         return capture
 
+    melody_min = 55 if melody_min_midi_note is None else melody_min_midi_note
+    melody_max = 83 if melody_max_midi_note is None else melody_max_midi_note
+
     melody_capture = analyze_audio(
         input_path,
         block_size=block_size,
@@ -858,8 +863,8 @@ def collect_midi_note_frames(
         max_frequency=max_frequency,
         min_bin_distance=min_bin_distance,
         mode=mode,
-        min_midi_note=55,
-        max_midi_note=83,
+        min_midi_note=melody_min,
+        max_midi_note=melody_max,
         harmonic_count=harmonic_count,
         relative_threshold=relative_threshold,
         min_confidence=min_confidence,
@@ -875,8 +880,8 @@ def collect_midi_note_frames(
         melody_capture["candidate_frames"],
         min_frames,
         merge_frames,
-        min_midi_note=55,
-        max_midi_note=83,
+        min_midi_note=melody_min,
+        max_midi_note=melody_max,
         jump_penalty=jump_penalty,
         octave_jump_penalty=octave_jump_penalty,
         silence_transition_penalty=silence_transition_penalty,
@@ -972,6 +977,8 @@ def export_audio_to_midi(
     jump_penalty=0.04,
     octave_jump_penalty=0.25,
     silence_transition_penalty=0.10,
+    melody_min_midi_note=None,
+    melody_max_midi_note=None,
     profile=None,
 ):
     if profile is not None:
@@ -1027,6 +1034,8 @@ def export_audio_to_midi(
         harmony_scale=harmony_scale,
         harmony_voices=harmony_voices,
         motor_count=motor_count,
+        melody_min_midi_note=melody_min_midi_note,
+        melody_max_midi_note=melody_max_midi_note,
         jump_penalty=jump_penalty,
         octave_jump_penalty=octave_jump_penalty,
         silence_transition_penalty=silence_transition_penalty,
@@ -1114,6 +1123,8 @@ def main():
     parser.add_argument("--merge-gap-frames", type=int, default=1, help="Lacuna maxima para unir notas iguais.")
     parser.add_argument("--min-note-ms", type=float, default=None, help="Duracao minima em ms nos modos novos.")
     parser.add_argument("--merge-gap-ms", type=float, default=None, help="Lacuna maxima em ms nos modos novos.")
+    parser.add_argument("--melody-min-midi-note", type=int, default=None, help="Menor nota MIDI da melodia nos modos novos.")
+    parser.add_argument("--melody-max-midi-note", type=int, default=None, help="Maior nota MIDI da melodia nos modos novos.")
     parser.add_argument("--harmony-key", default="D", help="Tonalidade do modo harmony.")
     parser.add_argument("--harmony-scale", default="minor", help="Escala do modo harmony: major ou minor.")
     parser.add_argument("--harmony-voices", type=int, default=6, help="Numero maximo de vozes no modo harmony.")
@@ -1155,6 +1166,8 @@ def main():
         harmony_key=args.harmony_key,
         harmony_scale=args.harmony_scale,
         harmony_voices=args.harmony_voices,
+        melody_min_midi_note=args.melody_min_midi_note,
+        melody_max_midi_note=args.melody_max_midi_note,
         jump_penalty=args.jump_penalty,
         octave_jump_penalty=args.octave_jump_penalty,
         silence_transition_penalty=args.silence_transition_penalty,
