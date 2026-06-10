@@ -13,13 +13,13 @@ docker compose up -d --build
 ## 2. Gerar a imagem da demo
 
 ```bash
-docker compose exec -T dsp2-env bash -lc "python3 demo/noise_reduction/noise_reduction_demo.py"
+docker compose exec -T dsp2-env bash -lc "cd /app && PYTHONPATH=/app python3 demo/noise_reduction/noise_reduction_demo.py"
 ```
 
 ## 3. Conferir o arquivo gerado
 
 ```bash
-docker compose exec -T dsp2-env bash -lc "ls -lh demo/noise_reduction/noise_reduction.png"
+docker compose exec -T dsp2-env bash -lc "cd /app && ls -lh demo/noise_reduction/noise_reduction.png"
 ```
 
 ## Resultado esperado

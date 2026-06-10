@@ -17,25 +17,37 @@ docker compose up -d --build
 ## 3. Gerar o MIDI correto para 6 motores
 
 ```bash
-docker compose exec -T dsp2-env bash -lc "python3 -m examples.audio_to_midi.app --input 'demo/demo_tetris/tetris.wav' --output 'demo/demo_tetris/tetris_6motors_v2.mid' --profile recognizable-orchestra-v2"
+docker compose exec -T dsp2-env bash -lc "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app --input 'demo/demo_tetris/tetris.wav' --output 'demo/demo_tetris/tetris_6motors_v2.mid' --profile recognizable-orchestra-v2"
 ```
 
-## 3.1. Opcional: gerar variante ajustada para comparar
+## 3.1. Opcional: gerar variante ajustada para comparar (CASQUEIRA)
 
 ```bash
-docker compose exec -T dsp2-env bash -lc "python3 -m examples.audio_to_midi.app --input 'demo/demo_tetris/tetris.wav' --output 'demo/demo_tetris/tetris_6motors_v2_tuned.mid' --profile recognizable-orchestra-v2 --hop-size 512 --min-note-ms 70 --merge-gap-ms 45"
+docker compose exec -T dsp2-env bash -lc "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app --input 'demo/demo_tetris/tetris.wav' --output 'demo/demo_tetris/tetris_6motors_v2_tuned.mid' --profile recognizable-orchestra-v2 --hop-size 512 --min-note-ms 70 --merge-gap-ms 45"
 ```
 
-## 3.2. Opcional: gerar variante ajustada com faixa de melodia
+## 3.1.1. Opcional: gerar STFT e cromograma da versao ajustada em uma janela de 10s
 
 ```bash
-docker compose exec -T dsp2-env bash -lc "python3 -m examples.audio_to_midi.app --input 'demo/demo_tetris/tetris.wav' --output 'demo/demo_tetris/tetris_6motors_v2_melody_range.mid' --profile recognizable-orchestra-v2 --melody-min-midi-note 64 --melody-max-midi-note 83"
+docker compose exec -T dsp2-env bash -lc "cd /app && PYTHONPATH=/app python3 demo/demo_tetris/analyze_tetris_audio.py"
+```
+
+Por padrao, o script usa a janela de `0s` a `10s`. Para outro trecho, use `--start-time` e `--duration`:
+
+```bash
+docker compose exec -T dsp2-env bash -lc "cd /app && PYTHONPATH=/app python3 demo/demo_tetris/analyze_tetris_audio.py --start-time 20 --duration 10"
+```
+
+## 3.2. Opcional: gerar variante ajustada com faixa de melodia 
+
+```bash
+docker compose exec -T dsp2-env bash -lc "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app --input 'demo/demo_tetris/tetris.wav' --output 'demo/demo_tetris/tetris_6motors_v2_melody_range.mid' --profile recognizable-orchestra-v2 --melody-min-midi-note 64 --melody-max-midi-note 83"
 ```
 
 ## 4. Confirmar que o arquivo foi criado
 
 ```bash
-docker compose exec -T dsp2-env bash -lc "ls -lh 'demo/demo_tetris/tetris_6motors_v2.mid'"
+docker compose exec -T dsp2-env bash -lc "cd /app && ls -lh 'demo/demo_tetris/tetris_6motors_v2.mid'"
 ```
 
 ## Arquivos
@@ -45,5 +57,7 @@ docker compose exec -T dsp2-env bash -lc "ls -lh 'demo/demo_tetris/tetris_6motor
 - Saida para abrir no MidPlayer: `demo/demo_tetris/tetris_6motors_v2.mid`
 - Saida opcional ajustada: `demo/demo_tetris/tetris_6motors_v2_tuned.mid`
 - Saida opcional com faixa de melodia: `demo/demo_tetris/tetris_6motors_v2_melody_range.mid`
+- STFT da versao ajustada: `demo/demo_tetris/tetris_6motors_v2_tuned_stft.png`
+- Cromograma da versao ajustada: `demo/demo_tetris/tetris_6motors_v2_tuned_chromagram.png`
 
 Use sempre a pasta `demo/demo_tetris`, sem acentos, para evitar falhas do MidPlayer com caminhos Unicode.

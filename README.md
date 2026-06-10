@@ -297,7 +297,7 @@ Coloque o MP3 de teste em `pratica/bosta/lacunosa.mp3`. Depois rode:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
+  "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
     --output 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid' \
     --profile recognizable-orchestra-v2"
@@ -307,7 +307,7 @@ Confirme que o arquivo foi criado:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "ls -lh 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid'"
+  "cd /app && ls -lh 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid'"
 ```
 
 ##### Testes separados de melodia e baixo
@@ -315,7 +315,7 @@ Para ouvir só a melodia no canal 1:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
+  "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
     --output 'pratica/bosta/lacunosa_melody_only.mid' \
     --mode melody_only \
@@ -332,7 +332,7 @@ Para ouvir melodia e baixo:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
+  "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
     --output 'pratica/bosta/lacunosa_melody_bass.mid' \
     --mode melody_bass \
@@ -369,7 +369,7 @@ Para comparar com o profile antigo:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
+  "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
     --output 'pratica/bosta/lacunosa_dsp2_6motors_v1.mid' \
     --profile recognizable-orchestra"
@@ -380,7 +380,7 @@ Gere o arquivo principal, verifique o `.mid` e rode o gate:
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "python3 -m examples.audio_to_midi.app \
+  "cd /app && PYTHONPATH=/app python3 -m examples.audio_to_midi.app \
     --input 'pratica/bosta/lacunosa.mp3' \
     --output 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid' \
     --profile recognizable-orchestra-v2"
@@ -388,7 +388,7 @@ docker compose exec -T dsp2-env bash -lc \
 
 ```bash
 docker compose exec -T dsp2-env bash -lc \
-  "python3 - <<'PY'
+  "cd /app && PYTHONPATH=/app python3 - <<'PY'
 import os
 path = 'pratica/bosta/lacunosa_dsp2_6motors_v2.mid'
 print(path, os.path.getsize(path), 'bytes')
