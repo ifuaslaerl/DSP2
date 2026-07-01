@@ -24,7 +24,6 @@ public:
         this->output_sample_rates.resize(1, 0.0);
     }
 
-    // A nova infraestrutura brilha aqui!
     void set_parameter_array(const std::string& param_name, const std::vector<double>& values) override {
         if (param_name == "kernel") {
             impulse_response.clear();
